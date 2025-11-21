@@ -104,16 +104,31 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, addDoc, getDocs, doc, setLogLevel, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // === CONFIGURACIÓN DE FIREBASE Y SEGURIDAD (ACTUALIZADO) ===
+        // === CONFIGURACIÓN DE FIREBASE Y SEGURIDAD (ACTUALIZADO PARA ROBUSTEZ) ===
         // Usamos las variables globales proporcionadas por el entorno de Canvas para evitar exponer secretos.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
+        
+        // ** CONFIGURACIÓN DE FIREBASE **
+        // Si está fuera del entorno (ej. GitHub Pages), la variable __firebase_config fallará.
+        // En ese caso, se usará el objeto de respaldo de abajo.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                // *** ¡CRÍTICO! SI ESTÁ DESPLEGANDO EXTERNAMENTE, PEGUE AQUÍ SU CONFIGURACIÓN COMPLETA ***
+                // *** (Obtenida del Paso 3 de la Guía de Implementación) ***
+                 apiKey: "AIzaSyAZgttBrxRAeeRELVA-3j71hQZ4NbxoeNo",
+  authDomain: "orlageneracion64.firebaseapp.com",
+  projectId: "orlageneracion64",
+  storageBucket: "orlageneracion64.firebasestorage.app",
+  messagingSenderId: "550229291802",
+  appId: "1:550229291802:web:1907dc83e4c3c0facc32a3"
+};
         
         // 🚨 CRÍTICO: DEBE REEMPLAZAR ESTOS VALORES
         // 1. UID del Administrador: El UID de Firebase que tendrá permisos para añadir/editar/eliminar.
         //    Obtenga este valor de la pantalla después de la carga (Su UID...).
-        const ADMIN_UID = 'zO29lS5hocXTO2pE13dxPVrPZE23'; 
+        const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52'; 
         // 2. Email del Administrador: La dirección a donde se enviarán las sugerencias de datos faltantes.
         const ADMIN_EMAIL = 'codema1964@gmail.com'; 
 
@@ -218,6 +233,7 @@
         /** Inicializa Firebase y autentica al usuario. */
         async function initializeFirebase() {
             try {
+                // El error ocurre aquí si firebaseConfig está incompleto o vacío.
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -253,7 +269,8 @@
         
         /** Comprueba si el usuario actual es el administrador (basado en la constante) */
         function isCurrentUserAdmin() {
-            return currentUserId && currentUserId === ADMIN_UID && ADMIN_UID !== 'zO29lS5hocXTO2pE13dxPVrPZE23';
+            // Aseguramos que el ADMIN_UID no sea el placeholder
+            return currentUserId && currentUserId === ADMIN_UID && ADMIN_UID !== 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
         }
         
         /** Carga los datos iniciales si la colección está vacía. */
@@ -514,7 +531,7 @@
             if (!person) return;
             
             // Comprobamos que el email del administrador esté configurado
-            if (ADMIN_EMAIL === 'admin@orlageneracion64.com' || !ADMIN_EMAIL) {
+            if (ADMIN_EMAIL === 'codema1964@gmail.com' || !ADMIN_EMAIL) {
                  document.getElementById('permission-message').textContent = "ERROR: El email del administrador ('ADMIN_EMAIL') aún no ha sido configurado en el código fuente para esta función.";
                  document.getElementById('permission-modal').classList.remove('hidden');
                  return;
