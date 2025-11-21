@@ -531,7 +531,7 @@
             if (!person) return;
             
             // Comprobamos que el email del administrador esté configurado
-            if (ADMIN_EMAIL === 'admin@orlageneracion64.com' || !ADMIN_EMAIL) {
+            if (ADMIN_EMAIL === 'codema1964@gmail.com' || !ADMIN_EMAIL) {
                  document.getElementById('permission-message').textContent = "ERROR: El email del administrador ('ADMIN_EMAIL') aún no ha sido configurado en el código fuente para esta función.";
                  document.getElementById('permission-modal').classList.remove('hidden');
                  return;
@@ -541,7 +541,7 @@
             const body = `Hola Administrador,\n\nMe gustaría proporcionar o actualizar la información de mi ficha en la Orla Interactiva CODEMA 1964:\n\nNombre: ${person.nombre} ${person.apellidos}\n\n[INSERTE AQUÍ los datos que desea añadir o corregir, por ejemplo: \n- URL de mi foto actual: (enlace)\n- Mi profesión es: (profesión)\n- Nuevo Email: (email)]\n\nGracias.`;
             
             // Crear el enlace mailto
-            const mailtoLink = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            const mailtoLink = `mailto:${codema1964@gmail.com}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
             
             // Abrir el cliente de correo
             window.location.href = mailtoLink;
