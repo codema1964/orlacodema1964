@@ -80,6 +80,14 @@
         }
         .input-group label {
             color: #0f172a; /* Accent-dark para labels */
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600; /* semibold */
+        }
+        .input-group input {
+            width: 100%;
+            display: block;
         }
         .text-xs-mono {
             font-size: 0.75rem;
@@ -90,37 +98,32 @@
 </head>
 <body class="min-h-screen">
 
-    <!-- Firebase y Lógica de la Orla (MISMO CÓDIGO FUNCIONAL QUE ANTES) -->
+    <!-- Firebase y Lógica de la Orla (SEGURIDAD MEJORADA) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, addDoc, getDocs, doc, setLogLevel, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // === CONFIGURACIÓN DE FIREBASE Y SEGURIDAD ===
-        const appId = 'default-app-id'; // CLAVE para la ruta de Firestore
-        const initialAuthToken = ''; 
+        // === CONFIGURACIÓN DE FIREBASE Y SEGURIDAD (ACTUALIZADO) ===
+        // Usamos las variables globales proporcionadas por el entorno de Canvas para evitar exponer secretos.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
         
-        // La configuración DEBE ser un objeto JavaScript encerrado en { }
-        const firebaseConfig = {
-            apiKey: "AIzaSyAZgttBrxRAeeRELVA-3j71hQZ4NbxoeNo",
-            authDomain: "orlageneracion64.firebaseapp.com",
-            projectId: "orlageneracion64",
-            storageBucket: "orlageneracion64.firebasestorage.app",
-            messagingSenderId: "550229291802",
-            appId: "1:550229291802:web:1907dc83e4c3c0facc32a3"
-        };
-        
-        // 🚨 CRÍTICO: Debe reemplazar 'YOUR_ADMIN_UID_HERE' con el UID que se mostrará abajo en la aplicación
-        // Este UID tendrá permiso TOTAL para escribir/editar.
-        const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
+        // 🚨 CRÍTICO: DEBE REEMPLAZAR ESTOS VALORES
+        // 1. UID del Administrador: El UID de Firebase que tendrá permisos para añadir/editar/eliminar.
+        //    Obtenga este valor de la pantalla después de la carga (Su UID...).
+        const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52'; 
+        // 2. Email del Administrador: La dirección a donde se enviarán las sugerencias de datos faltantes.
+        const ADMIN_EMAIL = 'codema1964@gmail.com'; 
 
         // === VARIABLES Y ESTADO DE LA APLICACIÓN ===
         let db, auth;
         let alumniData = [];
-        let currentView = null; // Se inicializa a null, se establece con la selección del usuario
+        let currentView = null; 
         let selectedPerson = null; 
         let currentUserId = null; 
-        let isDataListenerActive = false; // Bandera para evitar múltiples listeners
+        let isDataListenerActive = false; 
 
         // Base de datos de prueba para inicialización
         const initialSampleData = [
@@ -162,25 +165,6 @@
                     email: "beatriz@ejemplo.com"
                 }
             },
-            {
-                nombre: "Carlos",
-                apellidos: "Aznar Soto",
-                ownerUid: 'user-carlos-5678', 
-                antiguo: {
-                    fotoUrl: "https://placehold.co/150x150/2563eb/ffffff?text=Antigua\nCarlos",
-                    anoEntrada: 1968,
-                    anoSalida: 1976,
-                    cursoEntrada: "Párvulos",
-                    cursoSalida: "EGB",
-                    fechaFoto: "1973"
-                },
-                actual: {
-                    fotoUrl: "https://placehold.co/150x150/9333ea/ffffff?text=Actual\nCarlos",
-                    profesion: "Arquitecto",
-                    ciudad: "Barcelona",
-                    email: "carlos@ejemplo.com"
-                }
-            },
             // ... (otros datos de prueba omitidos por brevedad)
         ];
 
@@ -205,7 +189,6 @@
             const statusElement = document.getElementById('connection-status');
             if (statusElement) {
                 statusElement.innerHTML = message;
-                // Colores modernos para el estado
                 statusElement.className = `p-2 text-center rounded-lg font-semibold mt-2 ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
             }
             console.log(`[STATUS] ${message}`);
@@ -256,7 +239,6 @@
                         currentUserId = user.uid;
                         document.getElementById('current-uid-display').textContent = currentUserId;
                         updateStatus(`Conexión OK. Su UID: <span class="text-xs-mono">${currentUserId}</span>`, false);
-                        // Mostramos el modal de selección
                         showSelectionModal(); 
                     } else {
                         updateStatus("ERROR: Autenticación fallida. Revise su clave API y la configuración.", true);
@@ -271,12 +253,7 @@
         
         /** Comprueba si el usuario actual es el administrador (basado en la constante) */
         function isCurrentUserAdmin() {
-            return currentUserId === ADMIN_UID;
-        }
-
-        /** Comprueba si el usuario actual es el propietario de un documento. */
-        function isCurrentUserOwner(ownerUid) {
-            return currentUserId && currentUserId === ownerUid;
+            return currentUserId && currentUserId === ADMIN_UID && ADMIN_UID !== 'YOUR_ADMIN_UID_HERE';
         }
         
         /** Carga los datos iniciales si la colección está vacía. */
@@ -290,6 +267,7 @@
                     console.log("[DATA LOAD] Colección vacía. Iniciando carga de datos de prueba.");
                     updateStatus("Colección vacía. Cargando datos de prueba iniciales...", false);
                     
+                    // Solo el ADMIN_UID debe ser el propietario inicial de los datos de prueba para asegurar la edición
                     const dataWithAdminUid = initialSampleData.map(d => ({
                         ...d,
                         ownerUid: ADMIN_UID
@@ -349,8 +327,9 @@
 
         /** Abre el modal de entrada de datos, configurándolo para añadir o editar. */
         window.openDataEntryModal = function(mode, personId = null) {
-            if (!currentUserId) {
-                 document.getElementById('permission-message').textContent = "Necesitas tener un ID de usuario válido para añadir o editar datos.";
+            // COMPROBACIÓN DE PERMISOS: Solo el administrador puede añadir/editar.
+            if (!isCurrentUserAdmin()) {
+                 document.getElementById('permission-message').textContent = "Acceso denegado. Solo el administrador puede añadir o editar datos de la orla.";
                  document.getElementById('permission-modal').classList.remove('hidden');
                  return;
             }
@@ -367,41 +346,26 @@
 
             if (mode === 'edit' && personId) {
                 selectedPerson = alumniData.find(p => p.id === personId);
-                if (!selectedPerson) {
-                    console.error('Error: Compañero no encontrado para editar.');
-                    return;
-                }
+                if (!selectedPerson) return;
                 
-                // COMPROBACIÓN DE PERMISOS DE EDICIÓN
-                if (!isCurrentUserAdmin() && !isCurrentUserOwner(selectedPerson.ownerUid)) {
-                    document.getElementById('permission-message').textContent = "No tienes permiso para editar esta ficha. Solo el administrador o el propietario original pueden hacerlo.";
-                    document.getElementById('permission-modal').classList.remove('hidden');
-                    return;
-                }
-
-                // Rellenar formulario con datos existentes
                 titleElement.textContent = `Editar Datos de ${selectedPerson.nombre} ${selectedPerson.apellidos}`;
                 buttonElement.textContent = 'Guardar Cambios';
 
+                // Rellenar formulario con datos existentes
                 form.nombre.value = selectedPerson.nombre || '';
                 form.apellidos.value = selectedPerson.apellidos || '';
-                
-                // Datos Antiguos
                 form.fotoAntiguaUrl.value = selectedPerson.antiguo?.fotoUrl || '';
                 form.anoEntrada.value = selectedPerson.antiguo?.anoEntrada || '';
                 form.anoSalida.value = selectedPerson.antiguo?.anoSalida || '';
                 form.cursoEntrada.value = selectedPerson.antiguo?.cursoEntrada || '';
                 form.cursoSalida.value = selectedPerson.antiguo?.cursoSalida || '';
                 form.fechaFotoAntigua.value = selectedPerson.antiguo?.fechaFoto || '';
-
-                // Datos Actuales
                 form.fotoActualUrl.value = selectedPerson.actual?.fotoUrl || '';
                 form.profesion.value = selectedPerson.actual?.profesion || '';
                 form.ciudad.value = selectedPerson.actual?.ciudad || '';
                 form.email.value = selectedPerson.actual?.email || '';
 
                 window.closeModal(); 
-
             } else { // Modo 'add'
                 titleElement.textContent = 'Añadir Nuevo Compañero';
                 buttonElement.textContent = 'Guardar y Añadir a la Orla';
@@ -428,8 +392,15 @@
             const mode = document.getElementById('form-mode').value;
             const docId = document.getElementById('form-doc-id').value;
 
+            // Vuelve a comprobar permisos por si acaso
+            if (!isCurrentUserAdmin()) {
+                 statusElement.textContent = 'ERROR: No tienes permisos de administrador.';
+                 statusElement.className = 'text-center text-red-600 font-semibold mt-4';
+                 return;
+            }
+
             statusElement.textContent = (mode === 'add' ? 'Añadiendo' : 'Actualizando') + ' datos...';
-            statusElement.className = 'text-center text-accent-teal font-semibold mt-4'; // Usando el acento
+            statusElement.className = 'text-center text-accent-teal font-semibold mt-4'; 
 
             // Recoger datos del formulario
             const dataToSave = {
@@ -451,7 +422,6 @@
                 }
             };
             
-            // Validar que al menos el nombre y los apellidos estén presentes
             if (dataToSave.nombre === 'Sin Nombre' || dataToSave.apellidos === 'Sin Apellidos') {
                  statusElement.textContent = 'ERROR: El nombre y los apellidos son obligatorios.';
                  statusElement.className = 'text-center text-red-600 font-semibold mt-4';
@@ -463,7 +433,8 @@
                 
                 if (mode === 'add') {
                     const colRef = collection(db, colPath);
-                    await addDoc(colRef, { ...dataToSave, ownerUid: currentUserId });
+                    // El nuevo documento debe tener el UID del administrador para que él pueda editarlo después
+                    await addDoc(colRef, { ...dataToSave, ownerUid: currentUserId }); 
                     statusElement.textContent = '¡Compañero añadido con éxito!';
                 } else if (mode === 'edit' && docId) {
                     const docRef = doc(db, colPath, docId);
@@ -480,7 +451,7 @@
                 }, 1500);
 
             } catch (error) {
-                statusElement.textContent = `ERROR al guardar: ${error.message}. ¿Ha cambiado las reglas de Firestore?`;
+                statusElement.textContent = `ERROR al guardar: ${error.message}. Revise los permisos de edición del ADMIN_UID.`;
                 statusElement.className = 'text-center text-red-600 font-semibold mt-4';
                 console.error("[FIREBASE ERROR] Error al guardar datos:", error);
             }
@@ -491,21 +462,20 @@
         // ------------------------------------
         
         window.openDeleteConfirmModal = function(id) {
-            selectedPerson = alumniData.find(p => p.id === id);
-            if (!selectedPerson) return;
-            
-            // Comprobar permisos antes de abrir el modal
-            if (!isCurrentUserAdmin() && !isCurrentUserOwner(selectedPerson.ownerUid)) {
-                document.getElementById('permission-message').textContent = "No tienes permiso para eliminar esta ficha. Solo el administrador o el propietario original pueden hacerlo.";
+            // COMPROBACIÓN DE PERMISOS: Solo el administrador puede eliminar
+            if (!isCurrentUserAdmin()) {
+                document.getElementById('permission-message').textContent = "Acceso denegado. Solo el administrador puede eliminar fichas de la orla.";
                 document.getElementById('permission-modal').classList.remove('hidden');
                 return;
             }
             
-            // Establecer el ID del documento a eliminar y el nombre para el mensaje
+            selectedPerson = alumniData.find(p => p.id === id);
+            if (!selectedPerson) return;
+            
             document.getElementById('confirm-doc-id').value = id;
             document.getElementById('confirm-message-name').textContent = `${selectedPerson.nombre} ${selectedPerson.apellidos}`;
             
-            window.closeModal(); // Cerrar el modal de detalle
+            window.closeModal(); 
             document.getElementById('confirm-delete-modal').classList.remove('hidden');
             document.body.classList.add('overflow-hidden'); 
         }
@@ -519,9 +489,8 @@
             const docId = document.getElementById('confirm-doc-id').value;
             if (!docId) return;
 
-            // Mostrar estado de eliminación
             updateStatus(`Eliminando ficha de ${document.getElementById('confirm-message-name').textContent}...`, false);
-            closeDeleteConfirmModal(); // Cerrar el modal de confirmación
+            closeDeleteConfirmModal(); 
 
             try {
                 const colPath = getCollectionPath();
@@ -532,10 +501,33 @@
                 updateStatus(`Ficha eliminada con éxito.`, false);
                 
             } catch (error) {
-                // Si falla, probablemente es un error de permiso de Firestore
-                updateStatus(`ERROR al eliminar: ${error.message}. Verifique sus reglas.`, true);
+                updateStatus(`ERROR al eliminar: ${error.message}. Revise los permisos de eliminación del ADMIN_UID.`, true);
                 console.error("[FIREBASE ERROR] Error al eliminar datos:", error);
             }
+        }
+        
+        // ------------------------------------
+        // Lógica de Email para Sugerencia de Datos (NUEVA FUNCIÓN)
+        // ------------------------------------
+        window.sendMissingDataEmail = function(personId) {
+            const person = alumniData.find(p => p.id === personId);
+            if (!person) return;
+            
+            // Comprobamos que el email del administrador esté configurado
+            if (ADMIN_EMAIL === 'admin@orlageneracion64.com' || !ADMIN_EMAIL) {
+                 document.getElementById('permission-message').textContent = "ERROR: El email del administrador ('ADMIN_EMAIL') aún no ha sido configurado en el código fuente para esta función.";
+                 document.getElementById('permission-modal').classList.remove('hidden');
+                 return;
+            }
+
+            const subject = `Datos faltantes/actualizados para: ${person.nombre} ${person.apellidos}`;
+            const body = `Hola Administrador,\n\nMe gustaría proporcionar o actualizar la información de mi ficha en la Orla Interactiva CODEMA 1964:\n\nNombre: ${person.nombre} ${person.apellidos}\n\n[INSERTE AQUÍ los datos que desea añadir o corregir, por ejemplo: \n- URL de mi foto actual: (enlace)\n- Mi profesión es: (profesión)\n- Nuevo Email: (email)]\n\nGracias.`;
+            
+            // Crear el enlace mailto
+            const mailtoLink = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            // Abrir el cliente de correo
+            window.location.href = mailtoLink;
         }
 
 
@@ -585,7 +577,6 @@
                     ? 'Mostrar Orla Actual'
                     : 'Mostrar Orla Antigua';
                 
-                // Aplicamos las clases de color definidas en Tailwind config
                 toggleButton.classList.remove('bg-old-view', 'hover:bg-old-view/90', 'bg-current-view', 'hover:bg-current-view/90');
                 if (isOldView) {
                      toggleButton.classList.add('bg-current-view', 'hover:bg-current-view/90');
@@ -597,6 +588,14 @@
             document.getElementById('header-title').textContent = currentView === 'old'
                 ? 'Orla CODEMA 1964 - Época del Colegio'
                 : 'Orla CODEMA 1964 - Presente';
+            
+            // Mostrar botón de Añadir solo al administrador
+            const addButton = document.getElementById('add-companion-btn');
+            if (isCurrentUserAdmin()) {
+                addButton.classList.remove('hidden');
+            } else {
+                addButton.classList.add('hidden');
+            }
         }
 
         window.toggleAllPhotos = function() {
@@ -659,7 +658,6 @@
             selectedPerson = null;
         }
         
-        // Cierra el modal de permisos
         window.closePermissionModal = function() {
              document.getElementById('permission-modal').classList.add('hidden');
         }
@@ -677,21 +675,20 @@
             const toggleBtn = document.getElementById('modal-toggle-btn');
             const editBtn = document.getElementById('modal-edit-btn');
             const deleteBtn = document.getElementById('modal-delete-btn'); 
-            
+            const emailBtn = document.getElementById('modal-email-btn'); // NUEVO
+
             stateField.value = view;
 
             document.getElementById('modal-name').textContent = `${selectedPerson.nombre} ${selectedPerson.apellidos}`;
             document.getElementById('modal-owner').textContent = selectedPerson.ownerUid || 'Sin Propietario';
 
-            // Comprobar si se debe mostrar el botón de edición y eliminación
-            const canEditOrDelete = isCurrentUserAdmin() || isCurrentUserOwner(selectedPerson.ownerUid);
+            // Comprobar si se debe mostrar el botón de edición y eliminación (SOLO ADMIN)
+            const canEditOrDelete = isCurrentUserAdmin();
             
             if (canEditOrDelete) {
-                // Botón de Edición (Color de acento - Teal)
                 editBtn.classList.remove('hidden');
                 editBtn.onclick = () => openDataEntryModal('edit', selectedPerson.id);
                 
-                // Botón de Eliminación (Rojo estándar de Tailwind)
                 deleteBtn.classList.remove('hidden');
                 deleteBtn.onclick = () => openDeleteConfirmModal(selectedPerson.id);
             } else {
@@ -699,6 +696,10 @@
                 deleteBtn.classList.add('hidden');
             }
             
+            // Botón de Email (siempre visible para no-administradores para sugerir datos)
+            emailBtn.classList.remove('hidden');
+            emailBtn.onclick = () => sendMissingDataEmail(selectedPerson.id);
+
             const photoUrl = isOldView ? selectedPerson.antiguo?.fotoUrl : selectedPerson.actual?.fotoUrl;
             const placeholderColor = getPlaceholderColor(`${selectedPerson.nombre} ${selectedPerson.apellidos}`);
             const photoElement = document.getElementById('modal-photo');
@@ -727,7 +728,6 @@
 
             toggleBtn.textContent = isOldView ? 'Mostrar Foto Actual' : 'Mostrar Foto Antigua';
             
-            // Colores del botón de alternancia en el modal
             toggleBtn.classList.remove('bg-old-view', 'hover:bg-old-view/90', 'bg-current-view', 'hover:bg-current-view/90');
             if (isOldView) {
                 toggleBtn.classList.add('bg-current-view', 'hover:bg-current-view/90');
@@ -783,23 +783,31 @@
             <p class="text-xs text-center text-secondary-text mb-6">Propietario (UID): <span id="modal-owner" class="text-xs-mono"></span></p>
             
             <div class="flex flex-col md:flex-row gap-8">
-                <!-- Columna de la Foto -->
+                <!-- Columna de la Foto y Botones de Acción -->
                 <div class="md:w-1/3 flex flex-col items-center">
                     <div class="w-48 h-48 mb-4 bg-primary-bg rounded-full overflow-hidden shadow-inner">
                         <img id="modal-photo" src="" alt="Foto Personal" class="w-full h-full object-cover">
                     </div>
                     <input type="hidden" id="modal-view-state" value="old">
+                    
+                    <!-- Botón de Alternar Foto (Color de la vista contraria) -->
                     <button id="modal-toggle-btn" onclick="toggleModalPhoto()" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:opacity-90 shadow-md w-full max-w-[200px] mt-2 bg-current-view hover:bg-current-view/90">
                         Alternar Foto
                     </button>
+                    
+                    <!-- Botones de Gestión (SOLO ADMIN) y Email (NUEVO) -->
                     <div class="flex flex-col gap-3 w-full max-w-[200px] mt-4">
-                        <!-- Botón de Edición (Color de Acento: Teal) -->
+                        <!-- Botón de Edición (SOLO ADMIN) -->
                         <button id="modal-edit-btn" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:bg-accent-teal/90 shadow-md bg-accent-teal hidden">
                             Editar Datos
                         </button>
-                         <!-- Botón de Eliminación (Rojo Standard) -->
+                         <!-- Botón de Eliminación (SOLO ADMIN) -->
                         <button id="modal-delete-btn" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:bg-red-700 shadow-md bg-red-600 hidden">
                             Eliminar Ficha
+                        </button>
+                        <!-- Botón de Email (TODOS LOS USUARIOS) -->
+                        <button id="modal-email-btn" class="py-2 px-4 rounded-full text-accent-dark font-semibold border border-gray-300 bg-gray-100 hover:bg-gray-200 transition duration-300 shadow-sm">
+                            Sugerir Datos Faltantes (Email)
                         </button>
                     </div>
                 </div>
@@ -854,8 +862,8 @@
         <!-- Encabezado de la Aplicación (Diseño Moderno) -->
         <header class="bg-card-bg shadow-lg sticky top-0 z-10">
             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
-                <!-- Botón de Añadir (Color de Acento: Teal) -->
-                <button onclick="openAddModal()" class="order-2 md:order-1 mt-4 md:mt-0 py-2 px-4 rounded-full text-white font-semibold transition duration-300 bg-accent-teal hover:bg-accent-teal/90 shadow-md">
+                <!-- Botón de Añadir (SOLO ADMIN) -->
+                <button id="add-companion-btn" onclick="openAddModal()" class="order-2 md:order-1 mt-4 md:mt-0 py-2 px-4 rounded-full text-white font-semibold transition duration-300 bg-accent-teal hover:bg-accent-teal/90 shadow-md hidden">
                     Añadir Compañero
                 </button>
                 <h1 id="header-title" class="order-1 md:order-2 text-4xl font-extrabold text-center text-accent-dark tracking-tight transition-colors duration-300">
@@ -868,9 +876,9 @@
                     <!-- Estado se actualiza con la conexión -->
                 </div>
                 
-                <!-- Display UID para el usuario -->
+                <!-- Display UID para el usuario (CRÍTICO para configurar el ADMIN_UID) -->
                 <div class="w-full order-5 text-center text-secondary-text text-sm mt-1">
-                    Su UID (Propietario/Admin): <span id="current-uid-display" class="text-xs-mono font-bold text-accent-dark">Cargando...</span>
+                    Su UID (Cópielo para ADMIN_UID): <span id="current-uid-display" class="text-xs-mono font-bold text-accent-dark">Cargando...</span>
                 </div>
             </div>
         </header>
@@ -892,7 +900,7 @@
                     </select>
                 </div>
 
-                <!-- Botón de Alternancia General (Colores según la vista activa) -->
+                <!-- Botón de Alternancia General -->
                 <button id="toggle-all-btn" onclick="toggleAllPhotos()"
                         class="w-full md:w-auto py-3 px-6 rounded-xl text-white font-bold shadow-md transition duration-300 transform hover:scale-[1.02]">
                     Mostrar Orla Actual
@@ -908,7 +916,7 @@
         </main>
     </div>
     
-    <!-- Modal DINÁMICO (Formulario de Añadir/Editar Compañero) - Diseño Moderno -->
+    <!-- Modal DINÁMICO (Formulario de Añadir/Editar Compañero) -->
     <div id="data-entry-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden transition-opacity" onclick="if(event.target.id === 'data-entry-modal') closeDataEntryModal()">
         <div class="bg-card-bg rounded-xl shadow-2xl w-full max-w-2xl p-8 transform transition-all duration-300">
             <!-- Botón de Cerrar -->
@@ -917,7 +925,7 @@
             </button>
 
             <h2 id="data-entry-title" class="text-3xl font-extrabold text-center mb-6 text-accent-dark">Añadir Nuevo Compañero</h2>
-            <p class="text-center text-secondary-text mb-6">Complete los campos. Los campos de las fotos deben ser URLs directas a las imágenes.</p>
+            <p class="text-center text-secondary-text mb-6">Complete los campos. (Acceso solo para administradores)</p>
 
             <form id="data-entry-form" onsubmit="saveAlumnusData(event)">
                 
@@ -944,7 +952,6 @@
                             <label for="fotoAntiguaUrl">URL Foto Antigua</label>
                             <input type="url" id="fotoAntiguaUrl" name="fotoAntiguaUrl" placeholder="URL directa de la foto antigua" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
                         </div>
-                        <!-- ... otros campos con estilo actualizado ... -->
                         <div class="grid grid-cols-2 gap-2">
                             <div class="input-group">
                                 <label for="anoEntrada">Año Entrada</label>
