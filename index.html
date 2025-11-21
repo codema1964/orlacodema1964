@@ -81,7 +81,7 @@
         };
 
         const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
-        const ADMIN_EMAIL = 'tu_email@ejemplo.com'; 
+        const ADMIN_EMAIL = 'codema1964@gmail.com'; 
         const appId = 'default-app-id'; 
         let db, auth, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
         const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
@@ -249,7 +249,7 @@
                         <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
                     </div>
                     <h3 class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</h3>
-                    <h4 class="text-xs text-slate-500 leading-tight">${p.apellidos}</h4>
+                    <h4 class="text-xs text-slate-800 leading-tight">${p.apellidos}</h4>
                 </div>`;
             }).join('');
             
