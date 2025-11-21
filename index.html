@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Orla Interactiva - Generación del 64</title>
+    <title>Orla Interactiva CODEMA - Generación del 64</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +31,7 @@
             background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
             color: #1e293b;
             min-height: 100vh;
-            overflow-x: hidden; /* Evita scroll horizontal no deseado */
+            overflow-x: hidden;
         }
         .card-container {
             background: rgba(255, 255, 255, 0.95);
@@ -55,8 +55,10 @@
         .photo-wrapper:hover img.hidden-photo { opacity: 1; transform: scale(1); filter: blur(0px); }
         .photo-wrapper:hover img.visible-photo { opacity: 0; transform: scale(0.9); }
         
-        /* Ajustes de Scroll y Modal */
         .modal-overlay { background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); z-index: 50; }
+        /* Modal de edición con Z-Index superior para evitar bloqueos */
+        .modal-edit-overlay { background-color: rgba(0, 0, 0, 0.9); backdrop-filter: blur(5px); z-index: 60; }
+        
         .dark-scroll::-webkit-scrollbar { width: 6px; }
         .dark-scroll::-webkit-scrollbar-track { background: #1e293b; }
         .dark-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -79,7 +81,7 @@
         };
 
         const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
-        const ADMIN_EMAIL = 'codema1964@gmail.com'; 
+        const ADMIN_EMAIL = 'tu_email@ejemplo.com'; 
         const appId = 'default-app-id'; 
         let db, auth, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
         const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
@@ -87,7 +89,7 @@
         function updateStatus(msg, err=false) {
             const el = document.getElementById('connection-status');
             if (el) {
-                el.innerHTML = err ? `⚠️` : `●`; // Simplificado para movil
+                el.innerHTML = err ? `⚠️` : `●`;
                 el.className = `text-xs font-bold px-2 py-1 rounded-full ${err?'bg-red-500 text-white':'bg-emerald-500 text-white'}`;
             }
         }
@@ -104,10 +106,8 @@
                     if(u) {
                         currentUserId = u.uid;
                         const admin = isCurrentUserAdmin();
-                        // En móvil solo mostramos icono si es admin
                         document.getElementById('current-uid-display').innerHTML = admin ? 
-                            `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : 
-                            ``;
+                            `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : ``;
                         if(admin) document.getElementById('add-btn-header').classList.remove('hidden');
                         updateStatus("OK");
                         showSelectionModal();
@@ -117,8 +117,12 @@
         }
 
         function isCurrentUserAdmin() { return currentUserId === ADMIN_UID; }
-        function showSelectionModal() { document.getElementById('selection-modal').classList.remove('hidden'); document.getElementById('app-main-content').classList.add('hidden'); }
-        function hideSelectionModal() { document.getElementById('selection-modal').classList.add('hidden'); document.getElementById('app-main-content').classList.remove('hidden'); }
+        
+        // Funciones Globales de Navegación
+        window.showSelectionModal = function() { document.getElementById('selection-modal').classList.remove('hidden'); document.getElementById('app-main-content').classList.add('hidden'); }
+        window.hideSelectionModal = function() { document.getElementById('selection-modal').classList.add('hidden'); document.getElementById('app-main-content').classList.remove('hidden'); }
+        window.closeModal = function() { document.getElementById('modal-wrapper').classList.add('hidden'); }
+        window.closeDataEntryModal = function() { document.getElementById('data-entry-modal').classList.add('hidden'); }
         
         window.selectView = function(v) {
             currentView = v; hideSelectionModal();
@@ -129,69 +133,104 @@
             });
         }
 
+        // LÓGICA DE EDICIÓN CORREGIDA
         window.openDataEntryModal = function(mode, id=null) {
-            if(!isCurrentUserAdmin()) return;
-            const f = document.getElementById('data-entry-form'); f.reset();
-            document.getElementById('form-mode').value = mode;
-            document.getElementById('form-doc-id').value = id||'';
+            if(!isCurrentUserAdmin()) { alert("Permiso denegado"); return; }
+            
+            // 1. Resetear formulario
+            document.getElementById('data-entry-form').reset();
             document.getElementById('data-entry-status').textContent = '';
+            document.getElementById('form-mode').value = mode;
+            document.getElementById('form-doc-id').value = id || '';
+
             const title = document.getElementById('data-entry-title');
             const btn = document.getElementById('data-entry-button');
+            
+            // 2. Si es editar, rellenar datos
+            if(mode === 'edit' && id) {
+                // Aseguramos que tenemos el objeto más reciente
+                selectedPerson = alumniData.find(p => p.id === id);
+                if(!selectedPerson) { alert("Error: Ficha no encontrada"); return; }
 
-            if(mode==='edit' && id) {
-                selectedPerson = alumniData.find(p=>p.id===id);
                 title.textContent = `Editar: ${selectedPerson.nombre}`;
                 btn.textContent = 'Guardar Cambios';
-                f.nombre.value = selectedPerson.nombre||'';
-                f.apellidos.value = selectedPerson.apellidos||'';
-                f.fotoAntiguaUrl.value = selectedPerson.antiguo?.fotoUrl||'';
-                f.anoEntrada.value = selectedPerson.antiguo?.anoEntrada||'';
-                f.anoSalida.value = selectedPerson.antiguo?.anoSalida||'';
-                f.cursoEntrada.value = selectedPerson.antiguo?.cursoEntrada||'';
-                f.cursoSalida.value = selectedPerson.antiguo?.cursoSalida||'';
-                f.fechaFotoAntigua.value = selectedPerson.antiguo?.fechaFoto||'';
-                f.fotoActualUrl.value = selectedPerson.actual?.fotoUrl||'';
-                f.profesion.value = selectedPerson.actual?.profesion||'';
-                f.ciudad.value = selectedPerson.actual?.ciudad||'';
-                f.email.value = selectedPerson.actual?.email||'';
-                window.closeModal();
+
+                // Helper para rellenar seguro
+                const setVal = (fieldId, val) => {
+                    const el = document.getElementById(fieldId);
+                    if(el) el.value = val || '';
+                };
+
+                setVal('nombre', selectedPerson.nombre);
+                setVal('apellidos', selectedPerson.apellidos);
+                setVal('fotoAntiguaUrl', selectedPerson.antiguo?.fotoUrl);
+                setVal('anoEntrada', selectedPerson.antiguo?.anoEntrada);
+                setVal('anoSalida', selectedPerson.antiguo?.anoSalida);
+                setVal('cursoEntrada', selectedPerson.antiguo?.cursoEntrada);
+                setVal('cursoSalida', selectedPerson.antiguo?.cursoSalida);
+                setVal('fechaFotoAntigua', selectedPerson.antiguo?.fechaFoto);
+                setVal('fotoActualUrl', selectedPerson.actual?.fotoUrl);
+                setVal('profesion', selectedPerson.actual?.profesion);
+                setVal('ciudad', selectedPerson.actual?.ciudad);
+                setVal('email', selectedPerson.actual?.email);
+                
+                // 3. Cerrar explícitamente la ficha de detalle
+                window.closeModal(); 
             } else {
                 title.textContent = 'Nuevo Alumno';
                 btn.textContent = 'Crear Ficha';
             }
+
+            // 4. Mostrar el modal de edición
             document.getElementById('data-entry-modal').classList.remove('hidden');
         }
 
         window.saveAlumnusData = async function(e) {
             e.preventDefault();
-            const f = e.target;
             const st = document.getElementById('data-entry-status');
             st.innerHTML = '<span class="text-brand-teal animate-pulse">Guardando...</span>';
+            
+            // Recoger valores manualmente para mayor seguridad
+            const getVal = (id) => document.getElementById(id).value;
+            
             const data = {
-                nombre: f.nombre.value, apellidos: f.apellidos.value,
+                nombre: getVal('nombre'), 
+                apellidos: getVal('apellidos'),
                 antiguo: {
-                    fotoUrl: f.fotoAntiguaUrl.value, anoEntrada: f.anoEntrada.value, anoSalida: f.anoSalida.value,
-                    cursoEntrada: f.cursoEntrada.value, cursoSalida: f.cursoSalida.value, fechaFoto: f.fechaFotoAntigua.value
+                    fotoUrl: getVal('fotoAntiguaUrl'), anoEntrada: getVal('anoEntrada'), anoSalida: getVal('anoSalida'),
+                    cursoEntrada: getVal('cursoEntrada'), cursoSalida: getVal('cursoSalida'), fechaFoto: getVal('fechaFotoAntigua')
                 },
                 actual: {
-                    fotoUrl: f.fotoActualUrl.value, profesion: f.profesion.value, ciudad: f.ciudad.value, email: f.email.value
+                    fotoUrl: getVal('fotoActualUrl'), profesion: getVal('profesion'), ciudad: getVal('ciudad'), email: getVal('email')
                 },
                 ownerUid: currentUserId
             };
+
             try {
                 const path = getCollectionPath();
-                if(document.getElementById('form-mode').value==='add') await addDoc(collection(db, path), data);
-                else await updateDoc(doc(db, path, document.getElementById('form-doc-id').value), data);
-                st.innerHTML = '<span class="text-emerald-400">¡Guardado!</span>';
-                setTimeout(()=>document.getElementById('data-entry-modal').classList.add('hidden'), 800);
-            } catch(err) { st.textContent = 'Error al guardar'; }
+                const mode = document.getElementById('form-mode').value;
+                const docId = document.getElementById('form-doc-id').value;
+
+                if(mode === 'add') {
+                    await addDoc(collection(db, path), data);
+                } else {
+                    await updateDoc(doc(db, path, docId), data);
+                }
+                
+                st.innerHTML = '<span class="text-emerald-400">¡Guardado Correctamente!</span>';
+                setTimeout(() => window.closeDataEntryModal(), 800);
+            } catch(err) { 
+                console.error(err);
+                st.textContent = 'Error al guardar. Verifica tu conexión.'; 
+            }
         }
 
         window.deleteAlumnusData = async function() {
             try {
                 await deleteDoc(doc(db, getCollectionPath(), document.getElementById('confirm-doc-id').value));
                 document.getElementById('confirm-delete-modal').classList.add('hidden');
-            } catch(e){alert("Error");}
+                window.closeModal();
+            } catch(e){ alert("Error al borrar"); }
         }
 
         function getPlaceholderColor(n) { const h = n.split('').reduce((a,c)=>c.charCodeAt(0)+a,0)%360; return `hsl(${h},70%,85%)`; }
@@ -217,9 +256,8 @@
             const btn = document.getElementById('toggle-all-btn');
             const isOld = currentView === 'old';
             btn.innerHTML = isOld ? '💼 Ver Actualidad' : '🎓 Ver Colegio';
-            // Botón responsivo: Ancho total en móvil
             btn.className = `w-full md:w-auto py-3 px-6 rounded-lg text-white font-bold shadow-lg hover:shadow-xl transition-all ${isOld?'bg-new-purple':'bg-old-blue'}`;
-            document.getElementById('header-title').innerHTML = isOld ? 'Orla CODEMA 64 | <span class="opacity-70 font-light">Colegio</span>' : 'Orla CODEMA 64 | <span class="opacity-70 font-light">Presente</span>';
+            document.getElementById('header-title').innerHTML = isOld ? 'Orla CODEMA 1964 | <span class="opacity-70 font-light">Colegio</span>' : 'Orla CODEMA 1964 | <span class="opacity-70 font-light">Presente</span>';
         }
 
         window.performSearch = function() {
@@ -235,6 +273,7 @@
             document.getElementById('modal-wrapper').classList.remove('hidden');
             updateModal(currentView);
         }
+        
         window.updateModal = function(view) {
             if(!selectedPerson) return;
             document.getElementById('modal-view-state').value = view;
@@ -251,20 +290,25 @@
             document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
             document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-2">💼 Actualidad</h4>${row('Profesión', c.profesion)}${row('Ciudad', c.ciudad)}${row('Email', c.email)}`;
 
-            const edit=document.getElementById('modal-edit-btn'), del=document.getElementById('modal-del-btn'), mail=document.getElementById('modal-mail-btn');
+            const editBtn = document.getElementById('modal-edit-btn');
+            const delBtn = document.getElementById('modal-del-btn');
+            const mailBtn = document.getElementById('modal-mail-btn');
             
             if(isCurrentUserAdmin()) {
-                edit.classList.remove('hidden'); edit.onclick=()=>openDataEntryModal('edit', selectedPerson.id);
-                del.classList.remove('hidden'); del.onclick=()=> {
+                editBtn.classList.remove('hidden'); 
+                // ASIGNACIÓN DIRECTA DEL ONCLICK
+                editBtn.onclick = function() { openDataEntryModal('edit', selectedPerson.id); };
+                
+                delBtn.classList.remove('hidden'); 
+                delBtn.onclick = function() {
                     document.getElementById('confirm-doc-id').value = selectedPerson.id;
                     document.getElementById('confirm-name').textContent = selectedPerson.nombre;
                     document.getElementById('confirm-delete-modal').classList.remove('hidden');
-                    document.getElementById('modal-wrapper').classList.add('hidden');
                 }
-                mail.classList.add('hidden');
+                mailBtn.classList.add('hidden');
             } else {
-                edit.classList.add('hidden'); del.classList.add('hidden'); mail.classList.remove('hidden');
-                mail.onclick=()=>window.location.href=`mailto:${ADMIN_EMAIL}?subject=Datos ${selectedPerson.nombre}&body=Hola...`;
+                editBtn.classList.add('hidden'); delBtn.classList.add('hidden'); mailBtn.classList.remove('hidden');
+                mailBtn.onclick=()=>window.location.href=`mailto:${ADMIN_EMAIL}?subject=Datos ${selectedPerson.nombre}&body=Hola...`;
             }
             const tgl = document.getElementById('modal-toggle-btn');
             tgl.textContent = isOld ? 'Ver Foto Actual' : 'Ver Foto Antigua';
@@ -276,7 +320,7 @@
     <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-old-blue to-new-purple"></div>
-            <h2 class="text-3xl font-black text-slate-800 mb-2">ORLA Generación 1964</h2>
+            <h2 class="text-3xl font-black text-slate-800 mb-2">ORLA CODEMA Generación 64</h2>
             <p class="text-slate-500 mb-6">Corazón de María</p>
             <div class="space-y-3">
                 <button onclick="selectView('old')" class="w-full py-4 rounded-xl text-white font-bold bg-old-blue shadow-lg hover:scale-105 transition">🎓 Colegio</button>
@@ -302,16 +346,15 @@
                 <input type="text" id="search-input" onkeyup="performSearch()" placeholder="Buscar..." class="w-full md:flex-grow bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-teal">
                 <button id="toggle-all-btn" onclick="toggleAllPhotos()"></button>
             </div>
-
             <div id="orla-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6 pb-20"></div>
         </main>
     </div>
 
-    <div id="modal-wrapper" class="modal-overlay fixed inset-0 flex items-end md:items-center justify-center p-0 md:p-4 hidden" onclick="if(event.target.id==='modal-wrapper')document.getElementById('modal-wrapper').classList.add('hidden')">
+    <div id="modal-wrapper" class="modal-overlay fixed inset-0 flex items-end md:items-center justify-center p-0 md:p-4 hidden" onclick="if(event.target.id==='modal-wrapper')window.closeModal()">
         <div class="bg-modal-bg w-full md:w-auto md:max-w-4xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col max-h-[90vh] dark-scroll">
             <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
                 <h2 id="modal-name" class="text-lg font-bold text-white truncate pr-4"></h2>
-                <button onclick="document.getElementById('modal-wrapper').classList.add('hidden')" class="text-slate-400 hover:text-white text-2xl p-2">&times;</button>
+                <button onclick="window.closeModal()" class="text-slate-400 hover:text-white text-2xl p-2">&times;</button>
             </div>
             <div class="overflow-y-auto p-6">
                 <div class="flex flex-col md:flex-row gap-6">
@@ -325,7 +368,7 @@
                         <div class="w-full mt-4 space-y-3">
                             <button id="modal-mail-btn" class="hidden w-full py-3 rounded-lg bg-brand-amber text-white font-bold hover:bg-amber-600">✉ Enviar Datos</button>
                             <div class="flex gap-3 w-full">
-                                <button id="modal-edit-btn" class="hidden w-1/2 py-3 rounded-lg bg-slate-700 text-white font-bold hover:bg-slate-600">✏️ Editar</button>
+                                <button id="modal-edit-btn" class="hidden w-1/2 py-3 rounded-lg bg-slate-700 text-white font-bold hover:bg-slate-600 border border-slate-600">✏️ Editar</button>
                                 <button id="modal-del-btn" class="hidden w-1/2 py-3 rounded-lg bg-btn-red text-white font-bold hover:bg-red-600">🗑️ Borrar</button>
                             </div>
                         </div>
@@ -339,11 +382,11 @@
         </div>
     </div>
 
-    <div id="data-entry-modal" class="modal-overlay fixed inset-0 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
+    <div id="data-entry-modal" class="modal-edit-overlay fixed inset-0 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
         <div class="bg-modal-bg w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-700 p-6 max-h-[95vh] overflow-y-auto dark-scroll text-white">
             <div class="flex justify-between mb-6">
                 <h2 id="data-entry-title" class="text-xl font-bold"></h2>
-                <button onclick="document.getElementById('data-entry-modal').classList.add('hidden')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+                <button onclick="window.closeDataEntryModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
             </div>
             <form id="data-entry-form" onsubmit="saveAlumnusData(event)" class="space-y-4">
                 <input type="hidden" id="form-mode"><input type="hidden" id="form-doc-id">
@@ -351,7 +394,6 @@
                     <div><label class="text-xs font-bold text-slate-400">Nombre</label><input type="text" id="nombre" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                     <div><label class="text-xs font-bold text-slate-400">Apellidos</label><input type="text" id="apellidos" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                 </div>
-
                 <div class="p-3 bg-blue-900/10 rounded-xl border border-blue-900/30">
                     <h3 class="font-bold text-old-blue mb-2 text-sm">DATOS COLEGIO</h3>
                     <input type="url" id="fotoAntiguaUrl" placeholder="URL Foto Antigua" class="w-full p-2 mb-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
@@ -360,12 +402,11 @@
                         <input type="number" id="anoSalida" placeholder="Año Sal." class="p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
                     </div>
                     <div class="grid grid-cols-2 gap-2 mb-2">
-                        <input type="text" id="cursoEntrada" placeholder="1º EGB" class="p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
-                        <input type="text" id="cursoSalida" placeholder="8º EGB" class="p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
+                        <input type="text" id="cursoEntrada" placeholder="Curso Entr." class="p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
+                        <input type="text" id="cursoSalida" placeholder="Curso Sal." class="p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
                     </div>
                     <input type="text" id="fechaFotoAntigua" placeholder="Detalle Foto" class="w-full p-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
                 </div>
-
                 <div class="p-3 bg-purple-900/10 rounded-xl border border-purple-900/30">
                     <h3 class="font-bold text-new-purple mb-2 text-sm">DATOS ACTUALES</h3>
                     <input type="url" id="fotoActualUrl" placeholder="URL Foto Actual" class="w-full p-2 mb-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
@@ -375,14 +416,13 @@
                     </div>
                     <input type="email" id="email" placeholder="Email" class="w-full p-2 mt-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
                 </div>
-
                 <button type="submit" id="data-entry-button" class="w-full py-4 bg-brand-teal text-white font-bold rounded-xl shadow hover:bg-teal-700 transition"></button>
                 <div id="data-entry-status" class="text-center text-sm font-bold h-5"></div>
             </form>
         </div>
     </div>
 
-    <div id="confirm-delete-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
+    <div id="confirm-delete-modal" class="modal-edit-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
         <div class="bg-modal-bg rounded-xl p-6 max-w-xs w-full text-center shadow-2xl border border-slate-700">
             <h3 class="text-lg font-bold text-white mb-2">¿Borrar Ficha?</h3>
             <p class="text-sm text-slate-400 mb-6">Se eliminará a <span id="confirm-name" class="font-bold text-white"></span>.</p>
