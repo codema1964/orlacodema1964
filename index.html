@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orla Interactiva - Generación del 64</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración personalizada de Tailwind y la fuente Inter para un look moderno -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-bg': '#f7f9fb', // Fondo muy claro y limpio
+                        'card-bg': '#ffffff', // Fondo de tarjetas y modales
+                        'accent-dark': '#0f172a', // Texto principal (Slate-900)
+                        'accent-teal': '#14b8a6', // Turquesa/Teal, el color de acento vibrante (Emerald-500)
+                        'secondary-text': '#64748b', // Texto secundario/Placeholder (Slate-500)
+                        'old-view': '#2563eb', // Azul para la vista Antigua (Blue-600)
+                        'current-view': '#9333ea', // Morado para la vista Actual (Violet-600)
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Usamos la fuente Inter para un aspecto moderno y legible */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* Usando primary-bg */
+            color: #0f172a; /* Usando accent-dark */
+        }
+        /* Estilos de tarjeta con transiciones suaves y sombras modernas */
+        .card-container {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); /* Sombra suave */
+        }
+        .card-container:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); /* Sombra más profunda al pasar el ratón */
+        }
+        /* Efecto de intercambio de fotos */
+        .photo-wrapper {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.75rem; /* Esquinas más redondeadas */
+            width: 100%;
+            padding-top: 100%; 
+            border: 1px solid #e2e8f0; /* Borde sutil */
+        }
+        .photo-wrapper img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .photo-wrapper img.hidden-photo {
+            opacity: 0;
+            transform: scale(1.05);
+        }
+        .photo-wrapper:hover img.hidden-photo {
+             opacity: 1;
+             transform: scale(1);
+        }
+        .photo-wrapper:hover img.visible-photo {
+             opacity: 0;
+             transform: scale(0.95);
+        }
+
+        /* Clases para los modales */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 50;
+        }
+        .input-group label {
+            color: #0f172a; /* Accent-dark para labels */
+        }
+        .text-xs-mono {
+            font-size: 0.75rem;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Firebase y Lógica de la Orla (MISMO CÓDIGO FUNCIONAL QUE ANTES) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, getDocs, doc, setLogLevel, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // === CONFIGURACIÓN DE FIREBASE Y SEGURIDAD ===
+        const appId = 'default-app-id'; // CLAVE para la ruta de Firestore
+        const initialAuthToken = ''; 
+        
+        // La configuración DEBE ser un objeto JavaScript encerrado en { }
+        const firebaseConfig = {
+            apiKey: "AIzaSyAZgttBrxRAeeRELVA-3j71hQZ4NbxoeNo",
+            authDomain: "orlageneracion64.firebaseapp.com",
+            projectId: "orlageneracion64",
+            storageBucket: "orlageneracion64.firebasestorage.app",
+            messagingSenderId: "550229291802",
+            appId: "1:550229291802:web:1907dc83e4c3c0facc32a3"
+        };
+        
+        // 🚨 CRÍTICO: Debe reemplazar 'YOUR_ADMIN_UID_HERE' con el UID que se mostrará abajo en la aplicación
+        // Este UID tendrá permiso TOTAL para escribir/editar.
+        const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
+
+        // === VARIABLES Y ESTADO DE LA APLICACIÓN ===
+        let db, auth;
+        let alumniData = [];
+        let currentView = null; // Se inicializa a null, se establece con la selección del usuario
+        let selectedPerson = null; 
+        let currentUserId = null; 
+        let isDataListenerActive = false; // Bandera para evitar múltiples listeners
+
+        // Base de datos de prueba para inicialización
+        const initialSampleData = [
+            {
+                nombre: "Alejandro",
+                apellidos: "García Fernández",
+                ownerUid: ADMIN_UID, 
+                antiguo: {
+                    fotoUrl: "https://placehold.co/150x150/2563eb/ffffff?text=Antigua\nAlejandro",
+                    anoEntrada: 1970,
+                    anoSalida: 1978,
+                    cursoEntrada: "Párvulos",
+                    cursoSalida: "8º EGB",
+                    fechaFoto: "1975"
+                },
+                actual: {
+                    fotoUrl: "https://placehold.co/150x150/9333ea/ffffff?text=Actual\nAlejandro",
+                    profesion: "Ingeniero Civil",
+                    ciudad: "Madrid",
+                    email: "alejandro@ejemplo.com"
+                }
+            },
+            {
+                nombre: "Beatriz",
+                apellidos: "López Martínez",
+                ownerUid: 'user-beatriz-1234', 
+                antiguo: {
+                    fotoUrl: "https://placehold.co/150x150/2563eb/ffffff?text=Antigua\nBeatriz",
+                    anoEntrada: 1972,
+                    anoSalida: 1980,
+                    cursoEntrada: "1º EGB",
+                    cursoSalida: "BUP",
+                    fechaFoto: "1976"
+                },
+                actual: {
+                    fotoUrl: "https://placehold.co/150x150/9333ea/ffffff?text=Actual\nBeatriz",
+                    profesion: "Profesora de Historia",
+                    ciudad: "Gijón",
+                    email: "beatriz@ejemplo.com"
+                }
+            },
+            {
+                nombre: "Carlos",
+                apellidos: "Aznar Soto",
+                ownerUid: 'user-carlos-5678', 
+                antiguo: {
+                    fotoUrl: "https://placehold.co/150x150/2563eb/ffffff?text=Antigua\nCarlos",
+                    anoEntrada: 1968,
+                    anoSalida: 1976,
+                    cursoEntrada: "Párvulos",
+                    cursoSalida: "EGB",
+                    fechaFoto: "1973"
+                },
+                actual: {
+                    fotoUrl: "https://placehold.co/150x150/9333ea/ffffff?text=Actual\nCarlos",
+                    profesion: "Arquitecto",
+                    ciudad: "Barcelona",
+                    email: "carlos@ejemplo.com"
+                }
+            },
+            // ... (otros datos de prueba omitidos por brevedad)
+        ];
+
+        // Ruta de la colección pública (permite que todos los usuarios vean la misma orla)
+        const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
+        
+        // ------------------------------------
+        // Lógica de Ordenación 
+        // ------------------------------------
+
+        function sortByApellidos(a, b) {
+            const nameA = (a.apellidos || '').toUpperCase();
+            const nameB = (b.apellidos || '').toUpperCase();
+            
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return 0;
+        }
+
+        /** Actualiza el mensaje de estado en la UI. */
+        function updateStatus(message, isError = false) {
+            const statusElement = document.getElementById('connection-status');
+            if (statusElement) {
+                statusElement.innerHTML = message;
+                // Colores modernos para el estado
+                statusElement.className = `p-2 text-center rounded-lg font-semibold mt-2 ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            }
+            console.log(`[STATUS] ${message}`);
+        }
+        
+        /** Muestra el modal de selección de vista. */
+        function showSelectionModal() {
+            document.getElementById('selection-modal').classList.remove('hidden');
+            document.getElementById('app-main-content').classList.add('hidden');
+            document.getElementById('selection-status').textContent = "Selecciona una opción para ver la orla.";
+        }
+
+        /** Oculta el modal de selección y muestra el contenido principal. */
+        function hideSelectionModal() {
+            document.getElementById('selection-modal').classList.add('hidden');
+            document.getElementById('app-main-content').classList.remove('hidden');
+        }
+
+        /** Maneja la selección de vista del usuario */
+        window.selectView = function(viewType) {
+            currentView = viewType; // 'old' o 'current'
+            hideSelectionModal();
+            setupDataListener(); // Inicia la carga de datos después de la elección
+        }
+
+
+        /** Inicializa Firebase y autentica al usuario. */
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                setLogLevel('debug');
+                console.log("[FIREBASE] Inicialización de la aplicación completada.");
+
+                await setPersistence(auth, browserLocalPersistence);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    updateStatus("Conectando y autenticando anónimamente...", false);
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        document.getElementById('current-uid-display').textContent = currentUserId;
+                        updateStatus(`Conexión OK. Su UID: <span class="text-xs-mono">${currentUserId}</span>`, false);
+                        // Mostramos el modal de selección
+                        showSelectionModal(); 
+                    } else {
+                        updateStatus("ERROR: Autenticación fallida. Revise su clave API y la configuración.", true);
+                    }
+                });
+
+            } catch (error) {
+                updateStatus(`ERROR CRÍTICO al iniciar Firebase: ${error.message}`, true);
+                console.error("[FIREBASE ERROR] Error crítico al inicializar Firebase:", error);
+            }
+        }
+        
+        /** Comprueba si el usuario actual es el administrador (basado en la constante) */
+        function isCurrentUserAdmin() {
+            return currentUserId === ADMIN_UID;
+        }
+
+        /** Comprueba si el usuario actual es el propietario de un documento. */
+        function isCurrentUserOwner(ownerUid) {
+            return currentUserId && currentUserId === ownerUid;
+        }
+        
+        /** Carga los datos iniciales si la colección está vacía. */
+        async function loadInitialDataIfEmpty() {
+             const colRef = collection(db, getCollectionPath());
+             updateStatus("Verificando si la colección de la orla existe...", false);
+             try {
+                const querySnapshot = await getDocs(colRef);
+                
+                if (querySnapshot.empty) {
+                    console.log("[DATA LOAD] Colección vacía. Iniciando carga de datos de prueba.");
+                    updateStatus("Colección vacía. Cargando datos de prueba iniciales...", false);
+                    
+                    const dataWithAdminUid = initialSampleData.map(d => ({
+                        ...d,
+                        ownerUid: ADMIN_UID
+                    }));
+
+                    for (const person of dataWithAdminUid) {
+                        await addDoc(colRef, person);
+                    }
+                    console.log("[DATA LOAD] Datos de prueba cargados con éxito.");
+                    updateStatus("¡Orla lista! (Datos de prueba cargados).", false);
+                } else {
+                    console.log(`[DATA LOAD] Colección NO vacía. ${querySnapshot.size} documentos encontrados.`);
+                    updateStatus(`Orla cargada. ${querySnapshot.size} compañeros encontrados.`, false);
+                }
+             } catch(error) {
+                 updateStatus("ERROR DE PERMISO O RUTA: No se pudo leer/escribir. Revise las reglas de Firestore y la ruta.", true);
+                 console.error("[FIREBASE ERROR] Fallo al verificar o cargar datos. Revise las reglas/ruta:", error);
+             }
+        }
+
+        /** Establece el listener en tiempo real para la colección de la orla. */
+        function setupDataListener() {
+            if (isDataListenerActive) return; 
+            
+            const alumniCollectionRef = collection(db, getCollectionPath());
+            const q = query(alumniCollectionRef);
+
+            console.log(`[DATA LISTENER] Escuchando la ruta: ${getCollectionPath()}`);
+            isDataListenerActive = true;
+
+            onSnapshot(q, (snapshot) => {
+                if (snapshot.empty && alumniData.length === 0) {
+                     loadInitialDataIfEmpty();
+                } else {
+                    alumniData = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    })).sort(sortByApellidos); 
+                    
+                    window.displayData = [...alumniData];
+                    renderOrla();
+                    
+                    if (alumniData.length > 0) {
+                        updateStatus(`Orla cargada. ${alumniData.length} compañeros encontrados.`, false);
+                    }
+                }
+            }, (error) => {
+                updateStatus("ERROR DE LECTURA: Falló la conexión en tiempo real. Revise sus reglas de Firestore.", true);
+                console.error("[FIREBASE ERROR] Error en onSnapshot (lectura de datos):", error);
+                isDataListenerActive = false;
+            });
+        }
+        
+        // ------------------------------------
+        // Lógica del Formulario Dinámico (Añadir/Editar)
+        // ------------------------------------
+
+        /** Abre el modal de entrada de datos, configurándolo para añadir o editar. */
+        window.openDataEntryModal = function(mode, personId = null) {
+            if (!currentUserId) {
+                 document.getElementById('permission-message').textContent = "Necesitas tener un ID de usuario válido para añadir o editar datos.";
+                 document.getElementById('permission-modal').classList.remove('hidden');
+                 return;
+            }
+
+            const modal = document.getElementById('data-entry-modal');
+            const form = document.getElementById('data-entry-form');
+            const titleElement = document.getElementById('data-entry-title');
+            const buttonElement = document.getElementById('data-entry-button');
+            
+            form.reset();
+            document.getElementById('data-entry-status').textContent = '';
+            document.getElementById('form-mode').value = mode;
+            document.getElementById('form-doc-id').value = personId || '';
+
+            if (mode === 'edit' && personId) {
+                selectedPerson = alumniData.find(p => p.id === personId);
+                if (!selectedPerson) {
+                    console.error('Error: Compañero no encontrado para editar.');
+                    return;
+                }
+                
+                // COMPROBACIÓN DE PERMISOS DE EDICIÓN
+                if (!isCurrentUserAdmin() && !isCurrentUserOwner(selectedPerson.ownerUid)) {
+                    document.getElementById('permission-message').textContent = "No tienes permiso para editar esta ficha. Solo el administrador o el propietario original pueden hacerlo.";
+                    document.getElementById('permission-modal').classList.remove('hidden');
+                    return;
+                }
+
+                // Rellenar formulario con datos existentes
+                titleElement.textContent = `Editar Datos de ${selectedPerson.nombre} ${selectedPerson.apellidos}`;
+                buttonElement.textContent = 'Guardar Cambios';
+
+                form.nombre.value = selectedPerson.nombre || '';
+                form.apellidos.value = selectedPerson.apellidos || '';
+                
+                // Datos Antiguos
+                form.fotoAntiguaUrl.value = selectedPerson.antiguo?.fotoUrl || '';
+                form.anoEntrada.value = selectedPerson.antiguo?.anoEntrada || '';
+                form.anoSalida.value = selectedPerson.antiguo?.anoSalida || '';
+                form.cursoEntrada.value = selectedPerson.antiguo?.cursoEntrada || '';
+                form.cursoSalida.value = selectedPerson.antiguo?.cursoSalida || '';
+                form.fechaFotoAntigua.value = selectedPerson.antiguo?.fechaFoto || '';
+
+                // Datos Actuales
+                form.fotoActualUrl.value = selectedPerson.actual?.fotoUrl || '';
+                form.profesion.value = selectedPerson.actual?.profesion || '';
+                form.ciudad.value = selectedPerson.actual?.ciudad || '';
+                form.email.value = selectedPerson.actual?.email || '';
+
+                window.closeModal(); 
+
+            } else { // Modo 'add'
+                titleElement.textContent = 'Añadir Nuevo Compañero';
+                buttonElement.textContent = 'Guardar y Añadir a la Orla';
+            }
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        window.openAddModal = function() {
+            openDataEntryModal('add');
+        }
+
+        window.closeDataEntryModal = function() {
+            document.getElementById('data-entry-modal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+
+        window.saveAlumnusData = async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const statusElement = document.getElementById('data-entry-status');
+            const mode = document.getElementById('form-mode').value;
+            const docId = document.getElementById('form-doc-id').value;
+
+            statusElement.textContent = (mode === 'add' ? 'Añadiendo' : 'Actualizando') + ' datos...';
+            statusElement.className = 'text-center text-accent-teal font-semibold mt-4'; // Usando el acento
+
+            // Recoger datos del formulario
+            const dataToSave = {
+                nombre: form.nombre.value || 'Sin Nombre',
+                apellidos: form.apellidos.value || 'Sin Apellidos',
+                antiguo: {
+                    fotoUrl: form.fotoAntiguaUrl.value || '',
+                    anoEntrada: form.anoEntrada.value || 'N/D',
+                    anoSalida: form.anoSalida.value || 'N/D',
+                    cursoEntrada: form.cursoEntrada.value || 'N/D',
+                    cursoSalida: form.cursoSalida.value || 'N/D',
+                    fechaFoto: form.fechaFotoAntigua.value || 'N/D',
+                },
+                actual: {
+                    fotoUrl: form.fotoActualUrl.value || '',
+                    profesion: form.profesion.value || 'N/D',
+                    ciudad: form.ciudad.value || 'N/D',
+                    email: form.email.value || 'N/D',
+                }
+            };
+            
+            // Validar que al menos el nombre y los apellidos estén presentes
+            if (dataToSave.nombre === 'Sin Nombre' || dataToSave.apellidos === 'Sin Apellidos') {
+                 statusElement.textContent = 'ERROR: El nombre y los apellidos son obligatorios.';
+                 statusElement.className = 'text-center text-red-600 font-semibold mt-4';
+                 return;
+            }
+
+            try {
+                const colPath = getCollectionPath();
+                
+                if (mode === 'add') {
+                    const colRef = collection(db, colPath);
+                    await addDoc(colRef, { ...dataToSave, ownerUid: currentUserId });
+                    statusElement.textContent = '¡Compañero añadido con éxito!';
+                } else if (mode === 'edit' && docId) {
+                    const docRef = doc(db, colPath, docId);
+                    await updateDoc(docRef, dataToSave);
+                    statusElement.textContent = '¡Datos actualizados con éxito!';
+                } else {
+                    throw new Error("Modo de formulario no válido.");
+                }
+
+                statusElement.className = 'text-center text-green-600 font-semibold mt-4';
+                
+                setTimeout(() => {
+                    closeDataEntryModal();
+                }, 1500);
+
+            } catch (error) {
+                statusElement.textContent = `ERROR al guardar: ${error.message}. ¿Ha cambiado las reglas de Firestore?`;
+                statusElement.className = 'text-center text-red-600 font-semibold mt-4';
+                console.error("[FIREBASE ERROR] Error al guardar datos:", error);
+            }
+        }
+        
+        // ------------------------------------
+        // Lógica de Eliminación
+        // ------------------------------------
+        
+        window.openDeleteConfirmModal = function(id) {
+            selectedPerson = alumniData.find(p => p.id === id);
+            if (!selectedPerson) return;
+            
+            // Comprobar permisos antes de abrir el modal
+            if (!isCurrentUserAdmin() && !isCurrentUserOwner(selectedPerson.ownerUid)) {
+                document.getElementById('permission-message').textContent = "No tienes permiso para eliminar esta ficha. Solo el administrador o el propietario original pueden hacerlo.";
+                document.getElementById('permission-modal').classList.remove('hidden');
+                return;
+            }
+            
+            // Establecer el ID del documento a eliminar y el nombre para el mensaje
+            document.getElementById('confirm-doc-id').value = id;
+            document.getElementById('confirm-message-name').textContent = `${selectedPerson.nombre} ${selectedPerson.apellidos}`;
+            
+            window.closeModal(); // Cerrar el modal de detalle
+            document.getElementById('confirm-delete-modal').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden'); 
+        }
+
+        window.closeDeleteConfirmModal = function() {
+            document.getElementById('confirm-delete-modal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden'); 
+        }
+
+        window.deleteAlumnusData = async function() {
+            const docId = document.getElementById('confirm-doc-id').value;
+            if (!docId) return;
+
+            // Mostrar estado de eliminación
+            updateStatus(`Eliminando ficha de ${document.getElementById('confirm-message-name').textContent}...`, false);
+            closeDeleteConfirmModal(); // Cerrar el modal de confirmación
+
+            try {
+                const colPath = getCollectionPath();
+                const docRef = doc(db, colPath, docId);
+                
+                await deleteDoc(docRef);
+                
+                updateStatus(`Ficha eliminada con éxito.`, false);
+                
+            } catch (error) {
+                // Si falla, probablemente es un error de permiso de Firestore
+                updateStatus(`ERROR al eliminar: ${error.message}. Verifique sus reglas.`, true);
+                console.error("[FIREBASE ERROR] Error al eliminar datos:", error);
+            }
+        }
+
+
+        // --- FUNCIONES DE LA VISTA ---
+
+        function getPlaceholderColor(name) {
+            const hash = name.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0);
+            const hue = hash % 360;
+            return `hsl(${hue}, 40%, 80%)`;
+        }
+
+        window.renderCard = function(person) {
+            if (!currentView) return '';
+            
+            const visiblePhotoUrl = currentView === 'old' ? person.antiguo?.fotoUrl : person.actual?.fotoUrl;
+            const hiddenPhotoUrl = currentView === 'old' ? person.actual?.fotoUrl : person.antiguo?.fotoUrl;
+            const fullName = `${person.nombre} ${person.apellidos}`;
+            const placeholderColor = getPlaceholderColor(fullName);
+
+            return `
+                <div class="card-container bg-card-bg p-4 rounded-xl flex flex-col items-center text-center">
+                    <div class="photo-wrapper cursor-pointer mb-3" onclick="openModal('${person.id}')">
+                        <img src="${visiblePhotoUrl || ''}"
+                             onerror="this.style.backgroundColor='${placeholderColor}'; this.src='https://placehold.co/150x150/${placeholderColor.substring(4, 11)}/0f172a?text=${currentView === 'old' ? 'A' : 'C'}'"
+                             alt="Foto ${currentView === 'old' ? 'Antigua' : 'Actual'}"
+                             class="visible-photo">
+                        <img src="${hiddenPhotoUrl || ''}"
+                             onerror="this.style.backgroundColor='${placeholderColor}'; this.src='https://placehold.co/150x150/${placeholderColor.substring(4, 11)}/0f172a?text=${currentView === 'old' ? 'C' : 'A'}'"
+                             alt="Foto ${currentView === 'old' ? 'Actual' : 'Antigua'}"
+                             class="hidden-photo">
+                    </div>
+                    <h3 class="text-lg font-semibold text-accent-dark">${fullName}</h3>
+                </div>
+            `;
+        }
+
+        window.renderOrla = function() {
+            const orlaContainer = document.getElementById('orla-container');
+            if (!orlaContainer) return;
+
+            orlaContainer.innerHTML = window.displayData.map(renderCard).join('');
+            
+            const toggleButton = document.getElementById('toggle-all-btn');
+            if (toggleButton) {
+                const isOldView = currentView === 'old';
+                toggleButton.textContent = isOldView
+                    ? 'Mostrar Orla Actual'
+                    : 'Mostrar Orla Antigua';
+                
+                // Aplicamos las clases de color definidas en Tailwind config
+                toggleButton.classList.remove('bg-old-view', 'hover:bg-old-view/90', 'bg-current-view', 'hover:bg-current-view/90');
+                if (isOldView) {
+                     toggleButton.classList.add('bg-current-view', 'hover:bg-current-view/90');
+                } else {
+                     toggleButton.classList.add('bg-old-view', 'hover:bg-old-view/90');
+                }
+            }
+
+            document.getElementById('header-title').textContent = currentView === 'old'
+                ? 'Orla CODEMA 1964 - Época del Colegio'
+                : 'Orla CODEMA 1964 - Presente';
+        }
+
+        window.toggleAllPhotos = function() {
+            currentView = currentView === 'old' ? 'current' : 'old';
+            renderOrla();
+        }
+
+        window.performSearch = function() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const filterType = document.getElementById('filter-select').value;
+
+            window.displayData = alumniData.filter(person => {
+                const fullName = `${person.nombre} ${person.apellidos}`.toLowerCase();
+                
+                const pastData = person.antiguo 
+                    ? `${person.antiguo.anoEntrada} ${person.antiguo.anoSalida} ${person.antiguo.cursoEntrada} ${person.antiguo.cursoSalida}`.toLowerCase() 
+                    : '';
+                const currentData = person.actual 
+                    ? `${person.actual.profesion} ${person.actual.ciudad} ${person.actual.email}`.toLowerCase() 
+                    : '';
+
+                if (!query) return true; 
+
+                switch (filterType) {
+                    case 'all':
+                        return fullName.includes(query) || pastData.includes(query) || currentData.includes(query);
+                    case 'name':
+                        return fullName.includes(query);
+                    case 'past':
+                        return pastData.includes(query);
+                    case 'current':
+                        return currentData.includes(query);
+                    default:
+                        return false;
+                }
+            });
+            
+            window.displayData.sort(sortByApellidos);
+
+            renderOrla();
+        }
+
+        // ------------------------------------
+        // Lógica del Modal (Visualización Individual)
+        // ------------------------------------
+
+        window.openModal = function(id) {
+            selectedPerson = alumniData.find(p => p.id === id);
+            if (!selectedPerson) return;
+
+            document.getElementById('modal-wrapper').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden'); 
+
+            updateModalContent(currentView); 
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modal-wrapper').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            selectedPerson = null;
+        }
+        
+        // Cierra el modal de permisos
+        window.closePermissionModal = function() {
+             document.getElementById('permission-modal').classList.add('hidden');
+        }
+
+        window.toggleModalPhoto = function() {
+            const newView = document.getElementById('modal-view-state').value === 'old' ? 'current' : 'old';
+            updateModalContent(newView);
+        }
+
+        function updateModalContent(view) {
+            if (!selectedPerson) return;
+
+            const isOldView = view === 'old';
+            const stateField = document.getElementById('modal-view-state');
+            const toggleBtn = document.getElementById('modal-toggle-btn');
+            const editBtn = document.getElementById('modal-edit-btn');
+            const deleteBtn = document.getElementById('modal-delete-btn'); 
+            
+            stateField.value = view;
+
+            document.getElementById('modal-name').textContent = `${selectedPerson.nombre} ${selectedPerson.apellidos}`;
+            document.getElementById('modal-owner').textContent = selectedPerson.ownerUid || 'Sin Propietario';
+
+            // Comprobar si se debe mostrar el botón de edición y eliminación
+            const canEditOrDelete = isCurrentUserAdmin() || isCurrentUserOwner(selectedPerson.ownerUid);
+            
+            if (canEditOrDelete) {
+                // Botón de Edición (Color de acento - Teal)
+                editBtn.classList.remove('hidden');
+                editBtn.onclick = () => openDataEntryModal('edit', selectedPerson.id);
+                
+                // Botón de Eliminación (Rojo estándar de Tailwind)
+                deleteBtn.classList.remove('hidden');
+                deleteBtn.onclick = () => openDeleteConfirmModal(selectedPerson.id);
+            } else {
+                editBtn.classList.add('hidden');
+                deleteBtn.classList.add('hidden');
+            }
+            
+            const photoUrl = isOldView ? selectedPerson.antiguo?.fotoUrl : selectedPerson.actual?.fotoUrl;
+            const placeholderColor = getPlaceholderColor(`${selectedPerson.nombre} ${selectedPerson.apellidos}`);
+            const photoElement = document.getElementById('modal-photo');
+            photoElement.src = photoUrl || '';
+            photoElement.onerror = () => {
+                photoElement.style.backgroundColor = placeholderColor;
+                photoElement.src = `https://placehold.co/200x200/${placeholderColor.substring(4, 11)}/0f172a?text=${isOldView ? 'A' : 'C'}`;
+            };
+
+            const past = selectedPerson.antiguo || {};
+            document.getElementById('past-details').innerHTML = `
+                <h4 class="text-xl font-bold mb-3 text-old-view">Época en el Colegio</h4>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Años:</span> ${past.anoEntrada || 'N/D'} - ${past.anoSalida || 'N/D'}</p>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Curso Entrada:</span> ${past.cursoEntrada || 'N/D'}</p>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Curso Salida:</span> ${past.cursoSalida || 'N/D'}</p>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Fecha Foto:</span> ${past.fechaFoto || 'N/D'}</p>
+            `;
+
+            const current = selectedPerson.actual || {};
+            document.getElementById('current-details').innerHTML = `
+                <h4 class="text-xl font-bold mb-3 text-current-view">Actualidad</h4>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Profesión:</span> ${current.profesion || 'N/D'}</p>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Ciudad:</span> ${current.ciudad || 'N/D'}</p>
+                <p class="mb-1"><span class="font-semibold text-accent-dark">Email:</span> ${current.email || 'N/D'}</p>
+            `;
+
+            toggleBtn.textContent = isOldView ? 'Mostrar Foto Actual' : 'Mostrar Foto Antigua';
+            
+            // Colores del botón de alternancia en el modal
+            toggleBtn.classList.remove('bg-old-view', 'hover:bg-old-view/90', 'bg-current-view', 'hover:bg-current-view/90');
+            if (isOldView) {
+                toggleBtn.classList.add('bg-current-view', 'hover:bg-current-view/90');
+            } else {
+                toggleBtn.classList.add('bg-old-view', 'hover:bg-old-view/90');
+            }
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebase();
+        });
+
+    </script>
+
+    <!-- PANTALLA DE SELECCIÓN INICIAL (Diseño Moderno) -->
+    <div id="selection-modal" class="modal fixed inset-0 flex items-center justify-center p-4 transition-opacity z-50 hidden">
+        <div class="bg-card-bg rounded-xl shadow-2xl w-full max-w-2xl p-8 transform transition-all duration-300 text-center">
+            <h2 class="text-4xl font-extrabold text-accent-dark mb-4">¡Bienvenido a la Orla Interactiva CODEMA 1964!</h2>
+            <p class="text-xl text-secondary-text mb-10">Por favor, selecciona la época que deseas explorar:</p>
+
+            <div class="flex flex-col md:flex-row gap-6 justify-center">
+                <!-- Botón Orla Colegio (Color Azul) -->
+                <button onclick="selectView('old')"
+                        class="flex-1 py-4 px-6 rounded-xl text-white font-bold text-lg shadow-lg transition duration-300 bg-old-view hover:bg-old-view/90 hover:scale-[1.02]">
+                    <span class="text-3xl block mb-2">🎓</span>
+                    Orla Etapa del Colegio
+                </button>
+
+                <!-- Botón Orla Actual (Color Morado) -->
+                <button onclick="selectView('current')"
+                        class="flex-1 py-4 px-6 rounded-xl text-white font-bold text-lg shadow-lg transition duration-300 bg-current-view hover:bg-current-view/90 hover:scale-[1.02]">
+                    <span class="text-3xl block mb-2">💼</span>
+                    Orla Actual (Presente)
+                </button>
+            </div>
+            
+            <p id="selection-status" class="text-sm text-secondary-text mt-6">Esperando conexión...</p>
+        </div>
+    </div>
+
+
+    <!-- Modal (Ventana Emergente para Detalle) - Diseño Moderno -->
+    <div id="modal-wrapper" class="modal fixed inset-0 flex items-center justify-center p-4 hidden transition-opacity" onclick="if(event.target.id === 'modal-wrapper') closeModal()">
+        <div class="bg-card-bg rounded-xl shadow-2xl w-full max-w-4xl p-8 transform transition-all duration-300">
+            <!-- Botón de Cerrar (Estilo limpio) -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-secondary-text hover:text-accent-dark transition">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <!-- Título -->
+            <h2 id="modal-name" class="text-3xl font-extrabold text-center mb-2 text-accent-dark"></h2>
+            <p class="text-xs text-center text-secondary-text mb-6">Propietario (UID): <span id="modal-owner" class="text-xs-mono"></span></p>
+            
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Columna de la Foto -->
+                <div class="md:w-1/3 flex flex-col items-center">
+                    <div class="w-48 h-48 mb-4 bg-primary-bg rounded-full overflow-hidden shadow-inner">
+                        <img id="modal-photo" src="" alt="Foto Personal" class="w-full h-full object-cover">
+                    </div>
+                    <input type="hidden" id="modal-view-state" value="old">
+                    <button id="modal-toggle-btn" onclick="toggleModalPhoto()" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:opacity-90 shadow-md w-full max-w-[200px] mt-2 bg-current-view hover:bg-current-view/90">
+                        Alternar Foto
+                    </button>
+                    <div class="flex flex-col gap-3 w-full max-w-[200px] mt-4">
+                        <!-- Botón de Edición (Color de Acento: Teal) -->
+                        <button id="modal-edit-btn" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:bg-accent-teal/90 shadow-md bg-accent-teal hidden">
+                            Editar Datos
+                        </button>
+                         <!-- Botón de Eliminación (Rojo Standard) -->
+                        <button id="modal-delete-btn" class="py-2 px-4 rounded-full text-white font-semibold transition duration-300 hover:bg-red-700 shadow-md bg-red-600 hidden">
+                            Eliminar Ficha
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Columna de los Datos -->
+                <div class="md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-6 md:border-l md:border-secondary-text/30 md:pl-8">
+                    <div id="past-details" class="text-secondary-text">
+                        <!-- Datos Antiguos se cargan aquí -->
+                    </div>
+                    <div id="current-details" class="text-secondary-text">
+                        <!-- Datos Actuales se cargan aquí -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Permiso / Error -->
+    <div id="permission-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden transition-opacity" onclick="if(event.target.id === 'permission-modal') closePermissionModal()">
+        <div class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl relative shadow-2xl w-full max-w-sm" role="alert">
+            <strong class="font-bold text-lg">Acceso Denegado</strong>
+            <span id="permission-message" class="block sm:inline mt-2 text-sm">No tienes permiso para realizar esta acción.</span>
+             <button onclick="closePermissionModal()" class="absolute top-4 right-4 text-red-500 hover:text-red-700">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><title>Cerrar</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.191l-2.651 3.658a1.2 1.2 0 1 1-1.697-1.697l3.658-2.651-3.658-2.651a1.2 1.2 0 0 1 1.697-1.697l2.651 3.658 2.651-3.658a1.2 1.2 0 1 1 1.697 1.697z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de CONFIRMACIÓN de Eliminación -->
+    <div id="confirm-delete-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden transition-opacity" onclick="if(event.target.id === 'confirm-delete-modal') closeDeleteConfirmModal()">
+        <div class="bg-card-bg rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all duration-300 text-center">
+            <h3 class="text-2xl font-bold text-red-600 mb-4">Confirmar Eliminación</h3>
+            <p class="text-secondary-text mb-6">
+                ¿Está seguro de que desea eliminar permanentemente la ficha de <span id="confirm-message-name" class="font-semibold text-accent-dark"></span>?
+                Esta acción no se puede deshacer.
+            </p>
+            <input type="hidden" id="confirm-doc-id" value="">
+            <div class="flex justify-center gap-4">
+                <button onclick="closeDeleteConfirmModal()" class="py-2 px-4 rounded-full border border-gray-300 text-secondary-text font-semibold hover:bg-gray-100 transition">
+                    Cancelar
+                </button>
+                <button onclick="deleteAlumnusData()" class="py-2 px-4 rounded-full text-white font-bold bg-red-600 hover:bg-red-700 transition shadow-md">
+                    Sí, Eliminar Permanentemente
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Contenido principal de la aplicación (Inicialmente oculto) -->
+    <div id="app-main-content" class="hidden">
+        <!-- Encabezado de la Aplicación (Diseño Moderno) -->
+        <header class="bg-card-bg shadow-lg sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
+                <!-- Botón de Añadir (Color de Acento: Teal) -->
+                <button onclick="openAddModal()" class="order-2 md:order-1 mt-4 md:mt-0 py-2 px-4 rounded-full text-white font-semibold transition duration-300 bg-accent-teal hover:bg-accent-teal/90 shadow-md">
+                    Añadir Compañero
+                </button>
+                <h1 id="header-title" class="order-1 md:order-2 text-4xl font-extrabold text-center text-accent-dark tracking-tight transition-colors duration-300">
+                    <!-- Título se establece al seleccionar la vista -->
+                </h1>
+                <div class="order-3 w-full md:w-auto h-0 md:h-auto"></div> 
+                
+                <!-- Mensaje de estado de la conexión -->
+                <div id="connection-status" class="w-full order-4 p-2 text-center rounded-lg font-semibold mt-2 bg-gray-200 text-secondary-text">
+                    <!-- Estado se actualiza con la conexión -->
+                </div>
+                
+                <!-- Display UID para el usuario -->
+                <div class="w-full order-5 text-center text-secondary-text text-sm mt-1">
+                    Su UID (Propietario/Admin): <span id="current-uid-display" class="text-xs-mono font-bold text-accent-dark">Cargando...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controles de Búsqueda y Alternancia (Diseño Moderno) -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 bg-card-bg rounded-xl shadow-md mt-4">
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                
+                <!-- Barra de Búsqueda -->
+                <div class="flex w-full md:w-3/5 gap-2">
+                    <input type="text" id="search-input" onkeyup="performSearch()" placeholder="Buscar por nombre, apellidos, cursos, ciudad, profesión..."
+                           class="flex-grow p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-teal focus:border-accent-teal transition duration-150 text-accent-dark placeholder:text-secondary-text">
+                    <select id="filter-select" onchange="performSearch()"
+                            class="p-3 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-accent-teal focus:border-accent-teal transition duration-150 text-accent-dark">
+                        <option value="all">Todos los campos</option>
+                        <option value="name">Nombre/Apellidos</option>
+                        <option value="past">Datos Antiguos</option>
+                        <option value="current">Datos Actuales</option>
+                    </select>
+                </div>
+
+                <!-- Botón de Alternancia General (Colores según la vista activa) -->
+                <button id="toggle-all-btn" onclick="toggleAllPhotos()"
+                        class="w-full md:w-auto py-3 px-6 rounded-xl text-white font-bold shadow-md transition duration-300 transform hover:scale-[1.02]">
+                    Mostrar Orla Actual
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor Principal de la Orla -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="orla-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <p class="col-span-full text-center text-secondary-text">Seleccione una vista para comenzar...</p>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modal DINÁMICO (Formulario de Añadir/Editar Compañero) - Diseño Moderno -->
+    <div id="data-entry-modal" class="modal fixed inset-0 flex items-center justify-center p-4 hidden transition-opacity" onclick="if(event.target.id === 'data-entry-modal') closeDataEntryModal()">
+        <div class="bg-card-bg rounded-xl shadow-2xl w-full max-w-2xl p-8 transform transition-all duration-300">
+            <!-- Botón de Cerrar -->
+            <button onclick="closeDataEntryModal()" class="absolute top-4 right-4 text-secondary-text hover:text-accent-dark transition">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <h2 id="data-entry-title" class="text-3xl font-extrabold text-center mb-6 text-accent-dark">Añadir Nuevo Compañero</h2>
+            <p class="text-center text-secondary-text mb-6">Complete los campos. Los campos de las fotos deben ser URLs directas a las imágenes.</p>
+
+            <form id="data-entry-form" onsubmit="saveAlumnusData(event)">
+                
+                <input type="hidden" id="form-mode" value="add">
+                <input type="hidden" id="form-doc-id" value="">
+
+                <!-- Datos Principales -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-primary-bg rounded-lg border border-gray-200">
+                    <div class="input-group">
+                        <label for="nombre">Nombre *</label>
+                        <input type="text" id="nombre" name="nombre" required placeholder="Ej: Juan" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-teal focus:border-accent-teal">
+                    </div>
+                    <div class="input-group">
+                        <label for="apellidos">Apellidos *</label>
+                        <input type="text" id="apellidos" name="apellidos" required placeholder="Ej: Pérez Sánchez" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-teal focus:border-accent-teal">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Datos Antiguos (Colegio) -->
+                    <div>
+                        <h3 class="text-xl font-bold mb-3 text-old-view">Época de Colegio</h3>
+                        <div class="input-group">
+                            <label for="fotoAntiguaUrl">URL Foto Antigua</label>
+                            <input type="url" id="fotoAntiguaUrl" name="fotoAntiguaUrl" placeholder="URL directa de la foto antigua" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                        </div>
+                        <!-- ... otros campos con estilo actualizado ... -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="input-group">
+                                <label for="anoEntrada">Año Entrada</label>
+                                <input type="number" id="anoEntrada" name="anoEntrada" placeholder="Ej: 1972" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                            </div>
+                            <div class="input-group">
+                                <label for="anoSalida">Año Salida</label>
+                                <input type="number" id="anoSalida" name="anoSalida" placeholder="Ej: 1980" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="input-group">
+                                <label for="cursoEntrada">Curso Entrada</label>
+                                <input type="text" id="cursoEntrada" name="cursoEntrada" placeholder="Ej: 1º EGB" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                            </div>
+                            <div class="input-group">
+                                <label for="cursoSalida">Curso Salida</label>
+                                <input type="text" id="cursoSalida" name="cursoSalida" placeholder="Ej: 8º EGB" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="fechaFotoAntigua">Fecha de la Foto</label>
+                            <input type="text" id="fechaFotoAntigua" name="fechaFotoAntigua" placeholder="Ej: Mayo 1978" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-old-view focus:border-old-view">
+                        </div>
+                    </div>
+
+                    <!-- Datos Actuales (Presente) -->
+                    <div>
+                        <h3 class="text-xl font-bold mb-3 text-current-view">Actualidad</h3>
+                        <div class="input-group">
+                            <label for="fotoActualUrl">URL Foto Actual</label>
+                            <input type="url" id="fotoActualUrl" name="fotoActualUrl" placeholder="URL directa de la foto actual" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-current-view focus:border-current-view">
+                        </div>
+                        <div class="input-group">
+                            <label for="profesion">Profesión</label>
+                            <input type="text" id="profesion" name="profesion" placeholder="Ej: Abogado" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-current-view focus:border-current-view">
+                        </div>
+                        <div class="input-group">
+                            <label for="ciudad">Ciudad</label>
+                            <input type="text" id="ciudad" name="ciudad" placeholder="Ej: Sevilla" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-current-view focus:border-current-view">
+                        </div>
+                        <div class="input-group">
+                            <label for="email">Email de Contacto</label>
+                            <input type="email" id="email" name="email" placeholder="contacto@ejemplo.com (Opcional)" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-current-view focus:border-current-view">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Guardar (Color de Acento: Teal) -->
+                <button type="submit" id="data-entry-button" class="w-full py-3 px-6 rounded-xl text-white font-bold shadow-lg transition duration-300 bg-accent-teal hover:bg-accent-teal/90 mt-6">
+                    Guardar y Añadir a la Orla
+                </button>
+                <div id="data-entry-status" class="text-center mt-4"></div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
