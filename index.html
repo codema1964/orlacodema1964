@@ -240,18 +240,21 @@
             if(!c) return;
             c.innerHTML = window.displayData.map(p => {
                 const isOld = currentView === 'old';
-                const url = isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl;
-                const hidden = isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl;
-                const bg = getPlaceholderColor(p.nombre);
-                return `<div class="card-container p-2 sm:p-3 rounded-xl flex flex-col items-center text-center group relative">
-                    <div class="photo-wrapper cursor-pointer mb-2 border border-gray-200 group-hover:border-brand-teal" onclick="openModal('${p.id}')">
-                        <img src="${url||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
-                        <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
-                    </div>
-                    <h3 class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</h3>
-                    <h4 class="font bold text-slate-800 text-sm leading-tight">${p.apellidos}</h4>
-                </div>`;
-            }).join('');
+            const url = isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl;
+            const hidden = isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl;
+            const bg = getPlaceholderColor(p.nombre);
+            
+            return `<div class="card-container p-2 sm:p-3 rounded-xl flex flex-col items-center text-center group relative">
+                <div class="photo-wrapper cursor-pointer mb-2 border border-gray-200 group-hover:border-brand-teal" onclick="openModal('${p.id}')">
+                    <img src="${url||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
+                    <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
+                </div>
+                <div class="w-full">
+                    <div class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</div>
+                    <div class="font-bold text-slate-800 text-sm leading-tight">${p.apellidos}</div>
+                </div>
+            </div>`;
+        }).join('');
             
             const btn = document.getElementById('toggle-all-btn');
             const isOld = currentView === 'old';
@@ -320,8 +323,9 @@
     <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-old-blue to-new-purple"></div>
-            <h2 class="text-3xl font-black text-slate-800 mb-2">Generación 64</h2>
-            <p class="text-3xl font-black text-slate-800 mb-2">Corazón de María</p>
+            <h2 class="text-3xl font-black text-slate-800 mb-2">Corazón de María</h2>
+            <p class="text-3xl font-black text-slate-800 mb-2">Generación 64</p>
+            
             <div class="space-y-3">
                 <button onclick="selectView('old')" class="w-full py-4 rounded-xl text-white font-bold bg-old-blue shadow-lg hover:scale-105 transition">🎓 Colegio</button>
                 <button onclick="selectView('current')" class="w-full py-4 rounded-xl text-white font-bold bg-new-purple shadow-lg hover:scale-105 transition">💼 Actualidad</button>
