@@ -300,6 +300,17 @@
 
         function getPlaceholderColor(n) { const h = n.split('').reduce((a,c)=>c.charCodeAt(0)+a,0)%360; return `hsl(${h},70%,85%)`; }
         
+        // Función auxiliar para formatear la fecha a dd/mm/aaaa
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const parts = dateString.split('-');
+            // Si el formato es YYYY-MM-DD, lo invertimos
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateString;
+        }
+
         window.renderOrla = function() {
             const c = document.getElementById('orla-container');
             if(!c) return;
@@ -355,8 +366,8 @@
             const p = selectedPerson.antiguo||{}; const c = selectedPerson.actual||{};
             const row = (l,v) => `<div class="flex justify-between border-b border-slate-700 py-2 text-sm"><span class="text-slate-400 font-medium">${l}</span><span class="text-slate-200 text-right">${v||'-'}</span></div>`;
 
-            // NUEVO: Se muestra la Fecha de Nacimiento en los detalles
-            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Fecha Nac.', selectedPerson.fechaNacimiento)}${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
+            // NUEVO: Se usa formatDate() para mostrar la fecha correctamente
+            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Fecha Nac.', formatDate(selectedPerson.fechaNacimiento))}${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
             document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-2">💼 Actualidad</h4>${row('Profesión', c.profesion)}${row('Ciudad', c.ciudad)}${row('Email', c.email)}`;
 
             const editBtn = document.getElementById('modal-edit-btn');
