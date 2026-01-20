@@ -163,6 +163,7 @@
 
                 setVal('nombre', selectedPerson.nombre);
                 setVal('apellidos', selectedPerson.apellidos);
+                setVal('fechaNacimiento', selectedPerson.fechaNacimiento); // NUEVO: Cargar Fecha Nacimiento
                 setVal('fotoAntiguaUrl', selectedPerson.antiguo?.fotoUrl);
                 setVal('anoEntrada', selectedPerson.antiguo?.anoEntrada);
                 setVal('anoSalida', selectedPerson.antiguo?.anoSalida);
@@ -196,6 +197,7 @@
             const data = {
                 nombre: getVal('nombre'), 
                 apellidos: getVal('apellidos'),
+                fechaNacimiento: getVal('fechaNacimiento'), // NUEVO: Guardar Fecha Nacimiento
                 antiguo: {
                     fotoUrl: getVal('fotoAntiguaUrl'), anoEntrada: getVal('anoEntrada'), anoSalida: getVal('anoSalida'),
                     cursoEntrada: getVal('cursoEntrada'), cursoSalida: getVal('cursoSalida'), fechaFoto: getVal('fechaFotoAntigua')
@@ -290,7 +292,8 @@
             const p = selectedPerson.antiguo||{}; const c = selectedPerson.actual||{};
             const row = (l,v) => `<div class="flex justify-between border-b border-slate-700 py-2 text-sm"><span class="text-slate-400 font-medium">${l}</span><span class="text-slate-200 text-right">${v||'-'}</span></div>`;
 
-            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
+            // NUEVO: Se muestra la Fecha de Nacimiento en los detalles
+            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Fecha Nac.', selectedPerson.fechaNacimiento)}${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
             document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-2">💼 Actualidad</h4>${row('Profesión', c.profesion)}${row('Ciudad', c.ciudad)}${row('Email', c.email)}`;
 
             const editBtn = document.getElementById('modal-edit-btn');
@@ -398,6 +401,9 @@
                     <div><label class="text-xs font-bold text-slate-400">Nombre</label><input type="text" id="nombre" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                     <div><label class="text-xs font-bold text-slate-400">Apellidos</label><input type="text" id="apellidos" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                 </div>
+                <!-- NUEVO CAMPO: Fecha de Nacimiento -->
+                <div><label class="text-xs font-bold text-slate-400">Fecha de Nacimiento</label><input type="date" id="fechaNacimiento" class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
+                
                 <div class="p-3 bg-blue-900/10 rounded-xl border border-blue-900/30">
                     <h3 class="font-bold text-old-blue mb-2 text-sm">DATOS COLEGIO</h3>
                     <input type="url" id="fotoAntiguaUrl" placeholder="URL Foto Antigua" class="w-full p-2 mb-2 bg-slate-800 border border-slate-600 rounded text-white text-sm">
