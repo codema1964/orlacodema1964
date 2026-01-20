@@ -19,7 +19,17 @@
                         'btn-red': '#ef4444',
                         'modal-bg': '#0f172a',
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: {
+                        'fade-out': 'fadeOut 0.7s ease-out forwards',
+                        'bounce-slow': 'bounce 2s infinite',
+                    },
+                    keyframes: {
+                        fadeOut: {
+                            '0%': { opacity: '1' },
+                            '100%': { opacity: '0', visibility: 'hidden' },
+                        }
+                    }
                 },
             },
         }
@@ -62,9 +72,39 @@
         .dark-scroll::-webkit-scrollbar { width: 6px; }
         .dark-scroll::-webkit-scrollbar-track { background: #1e293b; }
         .dark-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        /* Estilo Splash Screen */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #0f172a; /* brand-dark */
+            z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.7s ease-out, visibility 0.7s;
+        }
+        #splash-screen.hidden-splash {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+
+    <!-- PANTALLA SPLASH -->
+    <div id="splash-screen">
+        <div class="text-brand-teal mb-6 animate-bounce-slow">
+            <!-- Icono Birrete SVG -->
+            <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path>
+            </svg>
+        </div>
+        <h1 class="text-3xl font-black text-white tracking-widest mb-2">CODEMA 1964</h1>
+        <p class="text-slate-400 text-sm font-medium tracking-wide uppercase">Cargando Recuerdos...</p>
+        <!-- Loader circular simple -->
+        <div class="mt-8 w-8 h-8 border-4 border-brand-teal border-t-transparent rounded-full animate-spin"></div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -94,7 +134,19 @@
             }
         }
 
+        function hideSplash() {
+            const splash = document.getElementById('splash-screen');
+            if (splash && !splash.classList.contains('hidden-splash')) {
+                splash.classList.add('hidden-splash');
+                // Eliminar del DOM después de la transición para limpiar memoria
+                setTimeout(() => splash.remove(), 800);
+            }
+        }
+
         async function init() {
+            // Promesa para asegurar que el splash se ve al menos 2 segundos
+            const minSplashTime = new Promise(resolve => setTimeout(resolve, 2000));
+
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -102,7 +154,8 @@
                 await setPersistence(auth, browserLocalPersistence);
                 updateStatus("...");
                 await signInAnonymously(auth);
-                onAuthStateChanged(auth, u => {
+                
+                onAuthStateChanged(auth, async u => {
                     if(u) {
                         currentUserId = u.uid;
                         const admin = isCurrentUserAdmin();
@@ -110,10 +163,20 @@
                             `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : ``;
                         if(admin) document.getElementById('add-btn-header').classList.remove('hidden');
                         updateStatus("OK");
+                        
+                        // Esperar a que pase el tiempo mínimo antes de quitar el splash
+                        await minSplashTime;
+                        hideSplash();
+                        
                         showSelectionModal();
                     }
                 });
-            } catch(e) { updateStatus("Err", true); }
+            } catch(e) { 
+                await minSplashTime; // Esperar incluso si hay error
+                hideSplash();
+                updateStatus("Err", true); 
+                alert("Error de conexión. Por favor, recarga la página.");
+            }
         }
 
         function isCurrentUserAdmin() { return currentUserId === ADMIN_UID; }
