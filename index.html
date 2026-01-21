@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Orla Interactiva CODEMA - Generación del 64</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="Orla-Codema64.ico">
+    <meta name="theme-color" content="#0d9488">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -88,6 +92,17 @@
         }
     </style>
 </head>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registrado con éxito', reg))
+        .catch(err => console.warn('Error al registrar el Service Worker', err));
+    });
+  }
+</script>
+
 <body>
 
     <!-- PANTALLA SPLASH -->
