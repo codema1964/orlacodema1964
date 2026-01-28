@@ -1,0 +1,21 @@
+name: Notificar Cumpleaños
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Se ejecuta a las 9:00 AM UTC (10:00 AM en España)
+  workflow_dispatch:      # Permite ejecutarlo a mano para probar
+
+jobs:
+  check-birthdays:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install firebase-admin
+      - name: Run script
+        env:
+          FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
+        run: python notificar_cumples.py
