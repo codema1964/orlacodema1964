@@ -105,10 +105,8 @@
 
 <body>
 
-    <!-- PANTALLA SPLASH -->
     <div id="splash-screen">
         <div class="text-brand-teal mb-6 animate-bounce-slow">
-            <!-- Icono Birrete SVG -->
             <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
@@ -117,14 +115,15 @@
         </div>
         <h1 class="text-3xl font-black text-white tracking-widest mb-2">CODEMA 1964</h1>
         <p class="text-slate-400 text-sm font-medium tracking-wide uppercase">Cargando Recuerdos...</p>
-        <!-- Loader circular simple -->
         <div class="mt-8 w-8 h-8 border-4 border-brand-teal border-t-transparent rounded-full animate-spin"></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Importamos Messaging
+        import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
         const firebaseConfig = {
             apiKey: "AIza" + "SyAZgttBrxRAeeRELVA-3j71hQZ4NbxoeNo", 
@@ -138,7 +137,12 @@
         const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
         const ADMIN_EMAIL = 'codema1964@gmail.com'; 
         const appId = 'default-app-id'; 
-        let db, auth, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
+        
+        // --- CONFIGURACIÓN DE NOTIFICACIONES ---
+        // ¡IMPORTANTE! Genera tu par de claves en Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+        const VAPID_KEY = 'BBEipgrXPOxTPYzRFP63bF6NJVsDPUnsmhMhqAXSSaoX75oBEUbiNJZ0LG5GMxBrhipkcyBQZuTZ3WCscou5sY0'; 
+        
+        let db, auth, messaging, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
         const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
 
         function updateStatus(msg, err=false) {
@@ -153,19 +157,22 @@
             const splash = document.getElementById('splash-screen');
             if (splash && !splash.classList.contains('hidden-splash')) {
                 splash.classList.add('hidden-splash');
-                // Eliminar del DOM después de la transición para limpiar memoria
                 setTimeout(() => splash.remove(), 800);
             }
         }
 
         async function init() {
-            // Promesa para asegurar que el splash se ve al menos 2 segundos
             const minSplashTime = new Promise(resolve => setTimeout(resolve, 2000));
 
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                // Inicializar Messaging
+                try {
+                    messaging = getMessaging(app);
+                } catch(e) { console.log("Messaging no soportado en este navegador"); }
+
                 await setPersistence(auth, browserLocalPersistence);
                 updateStatus("...");
                 await signInAnonymously(auth);
@@ -177,26 +184,63 @@
                         document.getElementById('current-uid-display').innerHTML = admin ? 
                             `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : ``;
                         if(admin) document.getElementById('add-btn-header').classList.remove('hidden');
-                        updateStatus("OK");
                         
-                        // Esperar a que pase el tiempo mínimo antes de quitar el splash
+                        // Mostrar botón de notificaciones si Messaging está activo
+                        if(messaging) document.getElementById('notif-btn-header').classList.remove('hidden');
+
+                        updateStatus("OK");
                         await minSplashTime;
                         hideSplash();
-                        
                         showSelectionModal();
                     }
                 });
             } catch(e) { 
-                await minSplashTime; // Esperar incluso si hay error
+                await minSplashTime;
                 hideSplash();
                 updateStatus("Err", true); 
+                console.error(e);
                 alert("Error de conexión. Por favor, recarga la página.");
+            }
+        }
+        
+        // --- FUNCIÓN PARA ACTIVAR NOTIFICACIONES ---
+        window.activarNotificaciones = async function() {
+            if (!messaging) return alert("Tu navegador no soporta notificaciones.");
+            
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    // Si el usuario no ha puesto la VAPID Key, avisar
+                    if(VAPID_KEY === 'TU_CLAVE_VAPID_AQUI') {
+                        alert("Falta configurar la VAPID Key en el código.");
+                        return;
+                    }
+
+                    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+                    if (token) {
+                        // Guardamos el token en la colección 'suscripciones'
+                        await setDoc(doc(db, "suscripciones", currentUserId), {
+                            token: token,
+                            deviceInfo: navigator.userAgent,
+                            updatedAt: new Date()
+                        });
+                        alert("🔔 ¡Genial! Te avisaremos de los cumpleaños.");
+                        // Opcional: Ocultar el botón una vez suscrito
+                         document.getElementById('notif-btn-header').classList.add('opacity-50', 'pointer-events-none');
+                    } else {
+                        alert("No se pudo obtener el token de notificación.");
+                    }
+                } else {
+                    alert("Debes permitir las notificaciones en el navegador para recibir avisos.");
+                }
+            } catch (err) {
+                console.error("Error al activar notificaciones:", err);
+                alert("Hubo un error al activar las notificaciones.");
             }
         }
 
         function isCurrentUserAdmin() { return currentUserId === ADMIN_UID; }
         
-        // Funciones Globales de Navegación
         window.showSelectionModal = function() { document.getElementById('selection-modal').classList.remove('hidden'); document.getElementById('app-main-content').classList.add('hidden'); }
         window.hideSelectionModal = function() { document.getElementById('selection-modal').classList.add('hidden'); document.getElementById('app-main-content').classList.remove('hidden'); }
         window.closeModal = function() { document.getElementById('modal-wrapper').classList.add('hidden'); }
@@ -211,11 +255,8 @@
             });
         }
 
-        // LÓGICA DE EDICIÓN CORREGIDA
         window.openDataEntryModal = function(mode, id=null) {
             if(!isCurrentUserAdmin()) { alert("Permiso denegado"); return; }
-            
-            // 1. Resetear formulario
             document.getElementById('data-entry-form').reset();
             document.getElementById('data-entry-status').textContent = '';
             document.getElementById('form-mode').value = mode;
@@ -224,24 +265,17 @@
             const title = document.getElementById('data-entry-title');
             const btn = document.getElementById('data-entry-button');
             
-            // 2. Si es editar, rellenar datos
             if(mode === 'edit' && id) {
-                // Aseguramos que tenemos el objeto más reciente
                 selectedPerson = alumniData.find(p => p.id === id);
                 if(!selectedPerson) { alert("Error: Ficha no encontrada"); return; }
-
                 title.textContent = `Editar: ${selectedPerson.nombre}`;
                 btn.textContent = 'Guardar Cambios';
 
-                // Helper para rellenar seguro
-                const setVal = (fieldId, val) => {
-                    const el = document.getElementById(fieldId);
-                    if(el) el.value = val || '';
-                };
+                const setVal = (fieldId, val) => { const el = document.getElementById(fieldId); if(el) el.value = val || ''; };
 
                 setVal('nombre', selectedPerson.nombre);
                 setVal('apellidos', selectedPerson.apellidos);
-                setVal('fechaNacimiento', selectedPerson.fechaNacimiento); // NUEVO: Cargar Fecha Nacimiento
+                setVal('fechaNacimiento', selectedPerson.fechaNacimiento);
                 setVal('fotoAntiguaUrl', selectedPerson.antiguo?.fotoUrl);
                 setVal('anoEntrada', selectedPerson.antiguo?.anoEntrada);
                 setVal('anoSalida', selectedPerson.antiguo?.anoSalida);
@@ -253,14 +287,11 @@
                 setVal('ciudad', selectedPerson.actual?.ciudad);
                 setVal('email', selectedPerson.actual?.email);
                 
-                // 3. Cerrar explícitamente la ficha de detalle
                 window.closeModal(); 
             } else {
                 title.textContent = 'Nuevo Alumno';
                 btn.textContent = 'Crear Ficha';
             }
-
-            // 4. Mostrar el modal de edición
             document.getElementById('data-entry-modal').classList.remove('hidden');
         }
 
@@ -268,14 +299,12 @@
             e.preventDefault();
             const st = document.getElementById('data-entry-status');
             st.innerHTML = '<span class="text-brand-teal animate-pulse">Guardando...</span>';
-            
-            // Recoger valores manualmente para mayor seguridad
             const getVal = (id) => document.getElementById(id).value;
             
             const data = {
                 nombre: getVal('nombre'), 
                 apellidos: getVal('apellidos'),
-                fechaNacimiento: getVal('fechaNacimiento'), // NUEVO: Guardar Fecha Nacimiento
+                fechaNacimiento: getVal('fechaNacimiento'),
                 antiguo: {
                     fotoUrl: getVal('fotoAntiguaUrl'), anoEntrada: getVal('anoEntrada'), anoSalida: getVal('anoSalida'),
                     cursoEntrada: getVal('cursoEntrada'), cursoSalida: getVal('cursoSalida'), fechaFoto: getVal('fechaFotoAntigua')
@@ -296,13 +325,9 @@
                 } else {
                     await updateDoc(doc(db, path, docId), data);
                 }
-                
                 st.innerHTML = '<span class="text-emerald-400">¡Guardado Correctamente!</span>';
                 setTimeout(() => window.closeDataEntryModal(), 800);
-            } catch(err) { 
-                console.error(err);
-                st.textContent = 'Error al guardar. Verifica tu conexión.'; 
-            }
+            } catch(err) { console.error(err); st.textContent = 'Error al guardar. Verifica tu conexión.'; }
         }
 
         window.deleteAlumnusData = async function() {
@@ -314,15 +339,10 @@
         }
 
         function getPlaceholderColor(n) { const h = n.split('').reduce((a,c)=>c.charCodeAt(0)+a,0)%360; return `hsl(${h},70%,85%)`; }
-        
-        // Función auxiliar para formatear la fecha a dd/mm/aaaa
         function formatDate(dateString) {
             if (!dateString) return '-';
             const parts = dateString.split('-');
-            // Si el formato es YYYY-MM-DD, lo invertimos
-            if (parts.length === 3) {
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            }
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
             return dateString;
         }
 
@@ -331,21 +351,21 @@
             if(!c) return;
             c.innerHTML = window.displayData.map(p => {
                 const isOld = currentView === 'old';
-            const url = isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl;
-            const hidden = isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl;
-            const bg = getPlaceholderColor(p.nombre);
-            
-            return `<div class="card-container p-2 sm:p-3 rounded-xl flex flex-col items-center text-center group relative">
-                <div class="photo-wrapper cursor-pointer mb-2 border border-gray-200 group-hover:border-brand-teal" onclick="openModal('${p.id}')">
-                    <img src="${url||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
-                    <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
-                </div>
-                <div class="w-full">
-                    <div class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</div>
-                    <div class="font-bold text-slate-800 text-sm leading-tight">${p.apellidos}</div>
-                </div>
-            </div>`;
-        }).join('');
+                const url = isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl;
+                const hidden = isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl;
+                const bg = getPlaceholderColor(p.nombre);
+                
+                return `<div class="card-container p-2 sm:p-3 rounded-xl flex flex-col items-center text-center group relative">
+                    <div class="photo-wrapper cursor-pointer mb-2 border border-gray-200 group-hover:border-brand-teal" onclick="openModal('${p.id}')">
+                        <img src="${url||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
+                        <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
+                    </div>
+                    <div class="w-full">
+                        <div class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</div>
+                        <div class="font-bold text-slate-800 text-sm leading-tight">${p.apellidos}</div>
+                    </div>
+                </div>`;
+            }).join('');
             
             const btn = document.getElementById('toggle-all-btn');
             const isOld = currentView === 'old';
@@ -381,7 +401,6 @@
             const p = selectedPerson.antiguo||{}; const c = selectedPerson.actual||{};
             const row = (l,v) => `<div class="flex justify-between border-b border-slate-700 py-2 text-sm"><span class="text-slate-400 font-medium">${l}</span><span class="text-slate-200 text-right">${v||'-'}</span></div>`;
 
-            // NUEVO: Se usa formatDate() para mostrar la fecha correctamente
             document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Fecha Nac.', formatDate(selectedPerson.fechaNacimiento))}${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
             document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-2">💼 Actualidad</h4>${row('Profesión', c.profesion)}${row('Ciudad', c.ciudad)}${row('Email', c.email)}`;
 
@@ -391,9 +410,7 @@
             
             if(isCurrentUserAdmin()) {
                 editBtn.classList.remove('hidden'); 
-                // ASIGNACIÓN DIRECTA DEL ONCLICK
                 editBtn.onclick = function() { openDataEntryModal('edit', selectedPerson.id); };
-                
                 delBtn.classList.remove('hidden'); 
                 delBtn.onclick = function() {
                     document.getElementById('confirm-doc-id').value = selectedPerson.id;
@@ -431,6 +448,10 @@
             <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
                 <h1 id="header-title" class="text-lg md:text-xl font-bold truncate">Orla</h1>
                 <div class="flex items-center gap-3">
+                    <button id="notif-btn-header" onclick="activarNotificaciones()" class="hidden bg-brand-amber hover:bg-amber-600 text-white p-2 rounded-full shadow transition-all" title="Activar avisos de cumpleaños">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    </button>
+
                     <div id="current-uid-display"></div>
                     <button id="add-btn-header" onclick="openDataEntryModal('add')" class="hidden bg-brand-teal hover:bg-teal-600 text-white p-2 rounded-full shadow"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
                 </div>
@@ -490,7 +511,6 @@
                     <div><label class="text-xs font-bold text-slate-400">Nombre</label><input type="text" id="nombre" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                     <div><label class="text-xs font-bold text-slate-400">Apellidos</label><input type="text" id="apellidos" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                 </div>
-                <!-- NUEVO CAMPO: Fecha de Nacimiento -->
                 <div><label class="text-xs font-bold text-slate-400">Fecha de Nacimiento</label><input type="date" id="fechaNacimiento" class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-brand-teal outline-none"></div>
                 
                 <div class="p-3 bg-blue-900/10 rounded-xl border border-blue-900/30">
