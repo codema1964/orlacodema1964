@@ -52,3 +52,15 @@ self.addEventListener('fetch', event => {
     fetch(event.request).catch(() => caches.match(event.request))
   );
 });
+
+// sw.js
+self.addEventListener('push', function(event) {
+    const data = event.data ? event.data.json() : {};
+    const title = data.title || 'Aviso de la Orla';
+    const options = {
+        body: data.body || 'Tienes una nueva notificación.',
+        icon: './Orla-Codema64.ico',
+        badge: './Orla-Codema64.ico'
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+});
