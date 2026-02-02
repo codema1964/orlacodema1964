@@ -42,7 +42,7 @@ def buscar_y_notificar():
             ),
             tokens=tokens,
         )
-        response = messaging.send_multicast(mensaje)
+        response = messaging.send_each_for_multicast(mensaje)
         print(f"Enviado con éxito a {response.success_count} dispositivos.")
     else:
         print("Hay cumples, pero no hay suscriptores.")
