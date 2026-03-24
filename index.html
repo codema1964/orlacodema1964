@@ -4,35 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Orla Interactiva CODEMA - Generación del 64</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="Orla-Codema64.ico">
+    <meta name="theme-color" content="#0d9488">
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-dark': '#0f172a', 'brand-teal': '#0d9488', 'brand-amber': '#d97706',
+                        'old-blue': '#3b82f6', 'new-purple': '#8b5cf6', 'btn-dark': '#1e293b', 
+                        'btn-red': '#ef4444', 'modal-bg': '#0f172a',
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: { 'fade-out': 'fadeOut 0.7s ease-out forwards', 'bounce-slow': 'bounce 2s infinite' },
+                    keyframes: { fadeOut: { '0%': { opacity: '1' }, '100%': { opacity: '0', visibility: 'hidden' } } }
+                },
+            },
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #cbd5e1; }
-        #splash-screen { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: opacity 0.5s; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); color: #1e293b; min-height: 100vh; overflow-x: hidden; }
+        .card-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.5); }
+        .card-container:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #94a3b8; z-index: 10; }
+        .photo-wrapper { position: relative; overflow: hidden; border-radius: 0.75rem; width: 100%; padding-top: 100%; background-color: #e2e8f0; }
+        .photo-wrapper img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.5s ease; }
+        .photo-wrapper img.hidden-photo { opacity: 0; transform: scale(1.1); filter: blur(2px); }
+        .photo-wrapper:hover img.hidden-photo { opacity: 1; transform: scale(1); filter: blur(0px); }
+        .photo-wrapper:hover img.visible-photo { opacity: 0; transform: scale(0.9); }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); z-index: 50; }
+        #splash-screen { position: fixed; inset: 0; background-color: #0f172a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.7s ease-out; }
         .hidden-splash { opacity: 0; visibility: hidden; pointer-events: none; }
-        .photo-wrapper { position: relative; width: 100%; padding-top: 100%; overflow: hidden; border-radius: 0.75rem; background: #e2e8f0; }
-        .photo-wrapper img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.4s; }
-        .photo-wrapper .hidden-photo { opacity: 0; }
-        .photo-wrapper:hover .hidden-photo { opacity: 1; }
-        .photo-wrapper:hover .visible-photo { opacity: 0; }
     </style>
 </head>
 <body>
 
     <div id="splash-screen">
-        <div id="admin-trigger-zone" class="mb-6 cursor-pointer active:scale-95 transition-transform">
-            <svg class="w-20 h-20 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+        <div id="splash-logo" class="text-brand-teal mb-6 animate-bounce-slow cursor-pointer">
+            <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
         </div>
-        <h1 id="splash-title" class="text-3xl font-black tracking-widest select-none">CODEMA 1964</h1>
-        <p class="text-slate-400 text-xs mt-2 uppercase tracking-widest">Iniciando Orla...</p>
-        
-        <div onclick="window.accesoSecretoAdmin()" class="absolute bottom-0 right-0 w-12 h-12 opacity-0 cursor-pointer"></div>
+        <h1 class="text-3xl font-black text-white tracking-widest mb-2">CODEMA 1964</h1>
+        <p class="text-slate-400 text-sm font-medium tracking-wide uppercase">Cargando Recuerdos...</p>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIza" + "SyAZgttBrxRAeeRELVA-3j71hQZ4NbxoeNo", 
@@ -46,22 +67,24 @@
         const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
         const appId = 'default-app-id';
         let db, auth, alumniData=[], currentView=null, currentUserId=null, selectedPerson=null;
+        const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
 
         async function init() {
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
+            await setPersistence(auth, browserLocalPersistence);
 
-            // 1. Procesar regreso de Google
-            await getRedirectResult(auth).catch(err => console.error("Error redirect:", err));
+            // CORRECCIÓN: Procesar el regreso de Google ANTES de mostrar la UI
+            try { await getRedirectResult(auth); } catch(e) { console.error(e); }
 
-            // 2. Gestionar estado de usuario
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUserId = user.uid;
+                    // Si el UID coincide con el Admin, habilitamos botones
                     if (currentUserId === ADMIN_UID) {
                         document.getElementById('admin-badge').classList.remove('hidden');
-                        document.getElementById('add-btn').classList.remove('hidden');
+                        document.getElementById('add-btn-header').classList.remove('hidden');
                     }
                     setTimeout(() => {
                         document.getElementById('splash-screen').classList.add('hidden-splash');
@@ -73,14 +96,13 @@
             });
         }
 
-        // FUNCIÓN DE ACCESO (La "Llave")
         window.accesoSecretoAdmin = function() {
             const provider = new GoogleAuthProvider();
             provider.setCustomParameters({ prompt: 'select_account' });
             signInWithRedirect(auth, provider);
         };
 
-        // Activador 1: Escribir admin
+        // Escucha de palabra admin
         let buffer = "";
         window.addEventListener('keydown', (e) => {
             buffer += e.key.toLowerCase();
@@ -88,124 +110,134 @@
             if (buffer.length > 10) buffer = buffer.substring(1);
         });
 
-        // Activador 2: Mantener pulsado el título 3 segundos
-        let timer;
-        const title = document.getElementById('splash-title');
-        title.addEventListener('mousedown', () => timer = setTimeout(window.accesoSecretoAdmin, 3000));
-        title.addEventListener('touchstart', () => timer = setTimeout(window.accesoSecretoAdmin, 3000));
-        title.addEventListener('mouseup', () => clearTimeout(timer));
-        title.addEventListener('touchend', () => clearTimeout(timer));
-
-        // --- Lógica Orla ---
+        // Lógica de Selección de Vista
         window.selectView = (v) => {
             currentView = v;
             document.getElementById('selection-modal').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
-            onSnapshot(query(collection(db, `/artifacts/${appId}/public/data/alumni`)), s => {
+            document.getElementById('app-main-content').classList.remove('hidden');
+            onSnapshot(query(collection(db, getCollectionPath())), s => {
                 alumniData = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>(a.apellidos||'').localeCompare(b.apellidos||''));
-                render(alumniData);
+                window.displayData = [...alumniData];
+                renderOrla();
             });
         };
 
-        function render(data) {
-            const container = document.getElementById('orla-grid');
+        window.renderOrla = () => {
+            const c = document.getElementById('orla-container');
             const isOld = currentView === 'old';
-            container.innerHTML = data.map(p => `
-                <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center text-center">
+            c.innerHTML = window.displayData.map(p => `
+                <div class="card-container p-3 rounded-xl flex flex-col items-center text-center group">
                     <div class="photo-wrapper cursor-pointer mb-2" onclick="openModal('${p.id}')">
-                        <img src="${(isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || ''}" onerror="this.src='https://placehold.co/200?text=?'" class="visible-photo">
-                        <img src="${(isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl) || ''}" onerror="this.src='https://placehold.co/200?text=?'" class="hidden-photo">
+                        <img src="${(isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || ''}" onerror="this.src='https://placehold.co/300?text=?'" class="visible-photo">
+                        <img src="${(isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl) || ''}" onerror="this.src='https://placehold.co/300?text=?'" class="hidden-photo">
                     </div>
-                    <div class="text-[13px] font-bold text-slate-800 leading-tight">${p.nombre} ${p.apellidos}</div>
+                    <div class="text-sm font-bold text-slate-800 leading-tight">${p.nombre}<br>${p.apellidos}</div>
                 </div>
             `).join('');
-            document.getElementById('view-toggle').innerHTML = isOld ? '💼 VER ACTUALIDAD' : '🎓 VER COLEGIO';
-        }
+            const btn = document.getElementById('toggle-all-btn');
+            btn.innerHTML = isOld ? '💼 Ver Presente' : '🎓 Ver Colegio';
+            btn.className = `w-full md:w-auto py-3 px-6 rounded-lg text-white font-bold shadow-lg ${isOld?'bg-new-purple':'bg-old-blue'}`;
+        };
 
         window.openModal = (id) => {
             selectedPerson = alumniData.find(p=>p.id===id);
-            const isOld = currentView === 'old';
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('m-name').textContent = `${selectedPerson.nombre} ${selectedPerson.apellidos}`;
-            document.getElementById('m-img').src = (isOld ? selectedPerson.antiguo?.fotoUrl : selectedPerson.actual?.fotoUrl) || '';
-            document.getElementById('m-data').innerHTML = `
-                <p class="text-sm"><b>Profesión:</b> ${selectedPerson.actual?.profesion || '-'}</p>
-                <p class="text-sm"><b>Ciudad:</b> ${selectedPerson.actual?.ciudad || '-'}</p>
-            `;
-            if(currentUserId === ADMIN_UID) document.getElementById('m-edit').classList.remove('hidden');
+            document.getElementById('modal-wrapper').classList.remove('hidden');
+            updateModal(currentView);
         };
 
-        window.toggleView = () => { currentView = currentView === 'old' ? 'current' : 'old'; render(alumniData); };
-        window.closeModal = () => document.getElementById('modal').classList.add('hidden');
-        
-        window.openEditor = (mode) => {
-            document.getElementById('editor').classList.remove('hidden');
-            if(mode === 'edit') {
-                document.getElementById('e-id').value = selectedPerson.id;
-                document.getElementById('e-nom').value = selectedPerson.nombre;
-                document.getElementById('e-ape').value = selectedPerson.apellidos;
+        window.updateModal = (view) => {
+            const isOld = view === 'old';
+            const p = selectedPerson;
+            document.getElementById('modal-name').textContent = `${p.nombre} ${p.apellidos}`;
+            document.getElementById('modal-photo').src = (isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || '';
+            
+            const row = (l, v) => `<div class="flex justify-between border-b border-slate-700 py-2 text-sm"><span>${l}</span><span class="text-slate-200">${v||'-'}</span></div>`;
+            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-1">🎓 Etapa Colegio</h4>
+                ${row('Años', (p.antiguo?.anoEntrada || '?') + ' - ' + (p.antiguo?.anoSalida || '?'))}
+                ${row('Curso Entr.', p.antiguo?.cursoEntrada)}
+                ${row('Curso Sal.', p.antiguo?.cursoSalida)}`;
+            
+            document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-1">💼 Actualidad</h4>
+                ${row('Profesión', p.actual?.profesion)}
+                ${row('Ciudad', p.actual?.ciudad)}
+                ${row('Email', p.actual?.email)}`;
+            
+            if (currentUserId === ADMIN_UID) {
+                document.getElementById('admin-actions').classList.remove('hidden');
             }
         };
 
-        window.save = async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('e-id').value;
-            const data = {
-                nombre: document.getElementById('e-nom').value,
-                apellidos: document.getElementById('e-ape').value,
-                antiguo: { fotoUrl: document.getElementById('e-f1').value },
-                actual: { fotoUrl: document.getElementById('e-f2').value, profesion: document.getElementById('e-prof').value }
-            };
-            id ? await updateDoc(doc(db, `/artifacts/${appId}/public/data/alumni`, id), data) : await addDoc(collection(db, `/artifacts/${appId}/public/data/alumni`), data);
-            location.reload();
+        window.openDataEntryModal = (mode) => {
+            document.getElementById('data-entry-modal').classList.remove('hidden');
+            if(mode === 'edit') {
+                document.getElementById('f-nom').value = selectedPerson.nombre;
+                document.getElementById('f-ape').value = selectedPerson.apellidos;
+                // ... cargar el resto de campos si es necesario
+            }
         };
 
+        window.closeModal = () => document.getElementById('modal-wrapper').classList.add('hidden');
         init();
     </script>
 
-    <div id="selection-modal" class="fixed inset-0 bg-slate-900/90 flex items-center justify-center p-6 hidden">
-        <div class="bg-white p-8 rounded-2xl w-full max-w-xs text-center">
-            <h2 class="font-black text-xl mb-6">¿Qué quieres ver?</h2>
-            <button onclick="selectView('old')" class="w-full py-4 mb-3 bg-blue-600 text-white rounded-xl font-bold">🎓 COLEGIO</button>
-            <button onclick="selectView('current')" class="w-full py-4 bg-purple-600 text-white rounded-xl font-bold">💼 PRESENTES</button>
+    <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full">
+            <h2 class="text-2xl font-black mb-6">CODEMA 1964</h2>
+            <button onclick="selectView('old')" class="w-full py-4 mb-3 bg-old-blue text-white rounded-xl font-bold hover:scale-105 transition">🎓 COLEGIO</button>
+            <button onclick="selectView('current')" class="w-full py-4 bg-new-purple text-white rounded-xl font-bold hover:scale-105 transition">💼 ACTUALIDAD</button>
         </div>
     </div>
 
-    <div id="main-app" class="hidden">
-        <header class="bg-slate-900 text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
-            <span class="font-bold tracking-tighter">CODEMA 64</span>
+    <div id="app-main-content" class="hidden">
+        <header class="bg-brand-dark text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-xl">
+            <span class="font-bold tracking-widest text-lg">CODEMA 1964</span>
             <div class="flex gap-2 items-center">
-                <span id="admin-badge" class="hidden bg-emerald-500 text-[9px] px-2 py-1 rounded-full font-bold">ADMIN</span>
-                <button id="add-btn" onclick="openEditor('add')" class="hidden bg-emerald-500 w-8 h-8 rounded-full">＋</button>
+                <span id="admin-badge" class="hidden bg-emerald-500 text-[10px] px-2 py-1 rounded font-bold">ADMIN</span>
+                <button id="add-btn-header" onclick="openDataEntryModal('add')" class="hidden bg-brand-teal p-2 rounded-full text-white">＋</button>
             </div>
         </header>
-        <div class="p-4 max-w-5xl mx-auto">
-            <button id="view-toggle" onclick="toggleView()" class="w-full mb-6 py-3 rounded-lg text-white font-bold shadow-md"></button>
-            <div id="orla-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+
+        <main class="p-4 max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row gap-3 mb-8">
+                <input type="text" id="search-input" onkeyup="window.displayData = alumniData.filter(p => (p.nombre + ' ' + p.apellidos).toLowerCase().includes(this.value.toLowerCase())); renderOrla();" placeholder="Buscar compañero..." class="flex-grow p-4 rounded-xl border-2 border-slate-200 outline-none focus:border-brand-teal transition">
+                <button id="toggle-all-btn" onclick="currentView = currentView==='old'?'current':'old'; renderOrla();"></button>
+            </div>
+            <div id="orla-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+        </main>
+    </div>
+
+    <div id="modal-wrapper" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden" onclick="if(event.target===this)closeModal()">
+        <div class="bg-modal-bg text-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl border border-slate-700">
+            <div class="p-4 border-b border-slate-800 flex justify-between bg-slate-900">
+                <h2 id="modal-name" class="font-bold"></h2>
+                <button onclick="closeModal()" class="text-2xl">&times;</button>
+            </div>
+            <div class="p-6 flex flex-col md:flex-row gap-8">
+                <div class="md:w-1/3 text-center">
+                    <img id="modal-photo" class="w-full h-64 object-cover rounded-xl border-2 border-slate-700 mb-4">
+                    <div id="admin-actions" class="hidden flex gap-2">
+                        <button onclick="openDataEntryModal('edit')" class="flex-1 py-2 bg-slate-700 rounded-lg text-xs">Editar</button>
+                        <button class="flex-1 py-2 bg-btn-red rounded-lg text-xs">Borrar</button>
+                    </div>
+                </div>
+                <div class="md:w-2/3 space-y-6">
+                    <div id="past-details" class="bg-slate-800/50 p-4 rounded-xl"></div>
+                    <div id="current-details" class="bg-slate-800/50 p-4 rounded-xl"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden" onclick="if(event.target===this)closeModal()">
-        <div class="bg-slate-900 text-white rounded-2xl p-6 w-full max-w-sm">
-            <img id="m-img" class="w-full h-64 object-cover rounded-xl mb-4">
-            <h2 id="m-name" class="text-xl font-bold mb-2"></h2>
-            <div id="m-data" class="space-y-1 opacity-80 mb-6"></div>
-            <button id="m-edit" onclick="openEditor('edit')" class="hidden w-full py-3 bg-slate-700 rounded-xl mb-2">Editar</button>
-            <button onclick="closeModal()" class="w-full py-3 text-slate-400">Cerrar</button>
+    <div id="data-entry-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
+        <div class="bg-modal-bg text-white p-6 rounded-2xl w-full max-w-lg border border-slate-700">
+            <h3 class="text-xl font-bold mb-4">Datos del Alumno</h3>
+            <div class="space-y-3">
+                <input type="text" id="f-nom" placeholder="Nombre" class="w-full p-3 bg-slate-800 rounded-lg">
+                <input type="text" id="f-ape" placeholder="Apellidos" class="w-full p-3 bg-slate-800 rounded-lg">
+                <button class="w-full py-4 bg-brand-teal rounded-xl font-bold">GUARDAR CAMBIOS</button>
+                <button onclick="document.getElementById('data-entry-modal').classList.add('hidden')" class="w-full py-2 text-slate-400">Cancelar</button>
+            </div>
         </div>
-    </div>
-
-    <div id="editor" class="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4 hidden">
-        <form onsubmit="save(event)" class="bg-white p-6 rounded-2xl w-full max-w-sm space-y-3">
-            <input type="hidden" id="e-id">
-            <input type="text" id="e-nom" placeholder="Nombre" class="w-full p-3 border rounded-lg">
-            <input type="text" id="e-ape" placeholder="Apellidos" class="w-full p-3 border rounded-lg">
-            <input type="url" id="e-f1" placeholder="URL Foto Colegio" class="w-full p-3 border rounded-lg">
-            <input type="url" id="e-f2" placeholder="URL Foto Actual" class="w-full p-3 border rounded-lg">
-            <input type="text" id="e-prof" placeholder="Profesión" class="w-full p-3 border rounded-lg">
-            <button type="submit" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl">GUARDAR</button>
-            <button type="button" onclick="document.getElementById('editor').classList.add('hidden')" class="w-full py-2 text-slate-500">Cancelar</button>
-        </form>
     </div>
 
 </body>
