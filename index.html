@@ -91,20 +91,10 @@
     </style>
 </head>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service Worker registrado con éxito', reg))
-        .catch(err => console.warn('Error al registrar el Service Worker', err));
-    });
-  }
-</script>
-
 <body>
 
     <div id="splash-screen">
-        <div class="text-brand-teal mb-6 animate-bounce-slow">
+        <div id="splash-logo" class="text-brand-teal mb-6 animate-bounce-slow cursor-pointer">
             <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
@@ -117,8 +107,11 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // Añadimos GoogleAuthProvider y signInWithPopup
-        import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Usamos Redirect en lugar de Popup para evitar bloqueos del navegador
+        import { 
+            getAuth, signInAnonymously, onAuthStateChanged, setPersistence, 
+            browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
@@ -132,26 +125,16 @@
         };
 
         const ADMIN_UID = 'hbQ6YVVOZqVQ6HbHgNhzeci6rQ52';
-        const ADMIN_EMAIL = 'codema1964@gmail.com'; 
         const appId = 'default-app-id'; 
         const VAPID_KEY = 'BBEipgrXPOxTPYzRFP63bF6NJVsDPUnsmhMhqAXSSaoX75oBEUbiNJZ0LG5GMxBrhipkcyBQZuTZ3WCscou5sY0'; 
         
         let db, auth, messaging, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
         const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
 
-        function updateStatus(msg, err=false) {
-            const el = document.getElementById('connection-status');
-            if (el) {
-                el.innerHTML = err ? `⚠️` : `●`;
-                el.className = `text-xs font-bold px-2 py-1 rounded-full ${err?'bg-red-500 text-white':'bg-emerald-500 text-white'}`;
-            }
-        }
-
         function hideSplash() {
             const splash = document.getElementById('splash-screen');
             if (splash && !splash.classList.contains('hidden-splash')) {
                 splash.classList.add('hidden-splash');
-                setTimeout(() => splash.remove(), 800);
             }
         }
 
@@ -161,52 +144,58 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+
+                // Verificamos si volvemos de una redirección de login
+                await getRedirectResult(auth).catch(e => console.error("Error al volver de Google", e));
+
                 try { messaging = getMessaging(app); } catch(e) {}
 
                 await setPersistence(auth, browserLocalPersistence);
-                updateStatus("...");
                 
                 onAuthStateChanged(auth, async u => {
                     if(u) {
                         currentUserId = u.uid;
                         const admin = isCurrentUserAdmin();
-                        document.getElementById('current-uid-display').innerHTML = admin ? 
-                            `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : ``;
                         
+                        // Si es Admin, mostramos el botón +
                         if(admin) {
                             document.getElementById('add-btn-header').classList.remove('hidden');
+                            document.getElementById('current-uid-display').innerHTML = `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>`;
                         } else {
                             document.getElementById('add-btn-header').classList.add('hidden');
+                            document.getElementById('current-uid-display').innerHTML = "";
                         }
                         
                         if(messaging) document.getElementById('notif-btn-header').classList.remove('hidden');
 
-                        updateStatus("OK");
                         await minSplashTime;
                         hideSplash();
                         showSelectionModal();
                     } else {
-                        // Si no hay sesión, entramos anónimos por defecto
+                        // Login anónimo por defecto para visitantes
                         await signInAnonymously(auth);
                     }
                 });
             } catch(e) { 
-                await minSplashTime; hideSplash(); updateStatus("Err", true); console.error(e);
+                await minSplashTime; hideSplash(); console.error(e);
             }
         }
         
         function isCurrentUserAdmin() { return currentUserId === ADMIN_UID; }
 
-        // --- SISTEMA DE ACCESO SECRETO ---
+        // --- SISTEMA DE ACCESO SECRETO (INVISIBLE) ---
         window.accesoSecretoAdmin = async function() {
             const provider = new GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
             try {
-                await signInWithPopup(auth, provider);
+                // Redirigimos para que no se bloquee la ventana
+                await signInWithRedirect(auth, provider);
             } catch (error) {
                 console.error("Error en login:", error);
             }
         }
 
+        // 1. Acceso por teclado: Escribir "admin"
         let keyBuffer = "";
         window.addEventListener('keydown', (e) => {
             keyBuffer += e.key.toLowerCase();
@@ -216,8 +205,18 @@
             }
             if (keyBuffer.length > 10) keyBuffer = keyBuffer.substring(1);
         });
+
+        // 2. Acceso por clics: 5 clics sobre el logo en el Splash
+        let clickCount = 0;
+        document.getElementById('splash-logo').addEventListener('click', () => {
+            clickCount++;
+            if (clickCount === 5) {
+                window.accesoSecretoAdmin();
+                clickCount = 0;
+            }
+        });
         
-        // --- RESTO DE FUNCIONES (SIN CAMBIOS) ---
+        // --- LÓGICA DE INTERFAZ (SIN CAMBIOS) ---
         window.showSelectionModal = function() { document.getElementById('selection-modal').classList.remove('hidden'); document.getElementById('app-main-content').classList.add('hidden'); }
         window.hideSelectionModal = function() { document.getElementById('selection-modal').classList.add('hidden'); document.getElementById('app-main-content').classList.remove('hidden'); }
         window.closeModal = function() { document.getElementById('modal-wrapper').classList.add('hidden'); }
@@ -232,87 +231,6 @@
             });
         }
 
-        window.openDataEntryModal = function(mode, id=null) {
-            if(!isCurrentUserAdmin()) { alert("Permiso denegado"); return; }
-            document.getElementById('data-entry-form').reset();
-            document.getElementById('data-entry-status').textContent = '';
-            document.getElementById('form-mode').value = mode;
-            document.getElementById('form-doc-id').value = id || '';
-
-            const title = document.getElementById('data-entry-title');
-            const btn = document.getElementById('data-entry-button');
-            
-            if(mode === 'edit' && id) {
-                selectedPerson = alumniData.find(p => p.id === id);
-                if(!selectedPerson) return;
-                title.textContent = `Editar: ${selectedPerson.nombre}`;
-                btn.textContent = 'Guardar Cambios';
-
-                const setVal = (fieldId, val) => { const el = document.getElementById(fieldId); if(el) el.value = val || ''; };
-                setVal('nombre', selectedPerson.nombre);
-                setVal('apellidos', selectedPerson.apellidos);
-                setVal('fechaNacimiento', selectedPerson.fechaNacimiento);
-                setVal('fotoAntiguaUrl', selectedPerson.antiguo?.fotoUrl);
-                setVal('anoEntrada', selectedPerson.antiguo?.anoEntrada);
-                setVal('anoSalida', selectedPerson.antiguo?.anoSalida);
-                setVal('cursoEntrada', selectedPerson.antiguo?.cursoEntrada);
-                setVal('cursoSalida', selectedPerson.antiguo?.cursoSalida);
-                setVal('fechaFotoAntigua', selectedPerson.antiguo?.fechaFoto);
-                setVal('fotoActualUrl', selectedPerson.actual?.fotoUrl);
-                setVal('profesion', selectedPerson.actual?.profesion);
-                setVal('ciudad', selectedPerson.actual?.ciudad);
-                setVal('email', selectedPerson.actual?.email);
-                window.closeModal(); 
-            } else {
-                title.textContent = 'Nuevo Alumno';
-                btn.textContent = 'Crear Ficha';
-            }
-            document.getElementById('data-entry-modal').classList.remove('hidden');
-        }
-
-        window.saveAlumnusData = async function(e) {
-            e.preventDefault();
-            const st = document.getElementById('data-entry-status');
-            st.innerHTML = '<span class="text-brand-teal animate-pulse">Guardando...</span>';
-            const getVal = (id) => document.getElementById(id).value;
-            const data = {
-                nombre: getVal('nombre'), apellidos: getVal('apellidos'), fechaNacimiento: getVal('fechaNacimiento'),
-                antiguo: {
-                    fotoUrl: getVal('fotoAntiguaUrl'), anoEntrada: getVal('anoEntrada'), anoSalida: getVal('anoSalida'),
-                    cursoEntrada: getVal('cursoEntrada'), cursoSalida: getVal('cursoSalida'), fechaFoto: getVal('fechaFotoAntigua')
-                },
-                actual: {
-                    fotoUrl: getVal('fotoActualUrl'), profesion: getVal('profesion'), ciudad: getVal('ciudad'), email: getVal('email')
-                },
-                ownerUid: currentUserId
-            };
-            try {
-                const path = getCollectionPath();
-                const mode = document.getElementById('form-mode').value;
-                const docId = document.getElementById('form-doc-id').value;
-                if(mode === 'add') { await addDoc(collection(db, path), data); } 
-                else { await updateDoc(doc(db, path, docId), data); }
-                st.innerHTML = '<span class="text-emerald-400">¡Guardado Correctamente!</span>';
-                setTimeout(() => window.closeDataEntryModal(), 800);
-            } catch(err) { st.textContent = 'Error al guardar.'; }
-        }
-
-        window.deleteAlumnusData = async function() {
-            try {
-                await deleteDoc(doc(db, getCollectionPath(), document.getElementById('confirm-doc-id').value));
-                document.getElementById('confirm-delete-modal').classList.add('hidden');
-                window.closeModal();
-            } catch(e){ alert("Error al borrar"); }
-        }
-
-        function getPlaceholderColor(n) { const h = n.split('').reduce((a,c)=>c.charCodeAt(0)+a,0)%360; return `hsl(${h},70%,85%)`; }
-        function formatDate(dateString) {
-            if (!dateString) return '-';
-            const parts = dateString.split('-');
-            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            return dateString;
-        }
-
         window.renderOrla = function() {
             const c = document.getElementById('orla-container');
             if(!c) return;
@@ -320,11 +238,10 @@
                 const isOld = currentView === 'old';
                 const url = isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl;
                 const hidden = isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl;
-                const bg = getPlaceholderColor(p.nombre);
                 return `<div class="card-container p-2 sm:p-3 rounded-xl flex flex-col items-center text-center group relative">
                     <div class="photo-wrapper cursor-pointer mb-2 border border-gray-200 group-hover:border-brand-teal" onclick="openModal('${p.id}')">
-                        <img src="${url||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
-                        <img src="${hidden||''}" onerror="this.style.backgroundColor='${bg}';this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
+                        <img src="${url||''}" onerror="this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'A':'C'}'" class="visible-photo">
+                        <img src="${hidden||''}" onerror="this.src='https://placehold.co/300x300/cccccc/000000?text=${isOld?'C':'A'}'" class="hidden-photo">
                     </div>
                     <div class="w-full">
                         <div class="font-bold text-slate-800 text-sm leading-tight">${p.nombre}</div>
@@ -335,7 +252,7 @@
             const btn = document.getElementById('toggle-all-btn');
             const isOld = currentView === 'old';
             btn.innerHTML = isOld ? '💼 Ver Actualidad' : '🎓 Ver Colegio';
-            btn.className = `w-full md:w-auto py-3 px-6 rounded-lg text-white font-bold shadow-lg hover:shadow-xl transition-all ${isOld?'bg-new-purple':'bg-old-blue'}`;
+            btn.className = `w-full md:w-auto py-3 px-6 rounded-lg text-white font-bold shadow-lg transition-all ${isOld?'bg-new-purple':'bg-old-blue'}`;
             document.getElementById('header-title').innerHTML = isOld ? 'CODEMA 1964 | <span class="opacity-70 font-light">Colegio</span>' : 'CODEMA 1964 | <span class="opacity-70 font-light">Presente</span>';
         }
 
@@ -363,40 +280,88 @@
             img.src = url||''; img.onerror=()=>{img.src=`https://placehold.co/400x400/333/fff?text=${isOld?'A':'C'}`};
             const p = selectedPerson.antiguo||{}; const c = selectedPerson.actual||{};
             const row = (l,v) => `<div class="flex justify-between border-b border-slate-700 py-2 text-sm"><span class="text-slate-400 font-medium">${l}</span><span class="text-slate-200 text-right">${v||'-'}</span></div>`;
-            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Fecha Nac.', formatDate(selectedPerson.fechaNacimiento))}${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}${row('Foto', p.fechaFoto)}`;
+            document.getElementById('past-details').innerHTML = `<h4 class="text-old-blue font-bold mb-2">🎓 Etapa Colegio</h4>${row('Años', `${p.anoEntrada||'?'} - ${p.anoSalida||'?'}`)}${row('Curso Entr.', p.cursoEntrada)}${row('Curso Sal.', p.cursoSalida)}`;
             document.getElementById('current-details').innerHTML = `<h4 class="text-new-purple font-bold mb-2">💼 Actualidad</h4>${row('Profesión', c.profesion)}${row('Ciudad', c.ciudad)}${row('Email', c.email)}`;
+            
             const editBtn = document.getElementById('modal-edit-btn');
             const delBtn = document.getElementById('modal-del-btn');
-            const mailBtn = document.getElementById('modal-mail-btn');
             if(isCurrentUserAdmin()) {
                 editBtn.classList.remove('hidden'); 
-                editBtn.onclick = function() { openDataEntryModal('edit', selectedPerson.id); };
+                editBtn.onclick = () => openDataEntryModal('edit', selectedPerson.id);
                 delBtn.classList.remove('hidden'); 
-                delBtn.onclick = function() {
+                delBtn.onclick = () => {
                     document.getElementById('confirm-doc-id').value = selectedPerson.id;
                     document.getElementById('confirm-name').textContent = selectedPerson.nombre;
                     document.getElementById('confirm-delete-modal').classList.remove('hidden');
                 }
-                mailBtn.classList.add('hidden');
             } else {
-                editBtn.classList.add('hidden'); delBtn.classList.add('hidden'); mailBtn.classList.remove('hidden');
-                mailBtn.onclick=()=>window.location.href=`mailto:${ADMIN_EMAIL}?subject=Datos ${selectedPerson.nombre}&body=Hola...`;
+                editBtn.classList.add('hidden'); delBtn.classList.add('hidden');
             }
             const tgl = document.getElementById('modal-toggle-btn');
             tgl.textContent = isOld ? 'Ver Foto Actual' : 'Ver Foto Antigua';
             tgl.className = `w-full py-3 rounded-lg font-bold text-white shadow mt-4 ${isOld?'bg-new-purple':'bg-old-blue'}`;
         }
 
+        window.openDataEntryModal = function(mode, id=null) {
+            document.getElementById('data-entry-form').reset();
+            document.getElementById('form-mode').value = mode;
+            document.getElementById('form-doc-id').value = id || '';
+            if(mode === 'edit' && id) {
+                selectedPerson = alumniData.find(p => p.id === id);
+                document.getElementById('nombre').value = selectedPerson.nombre;
+                document.getElementById('apellidos').value = selectedPerson.apellidos;
+                document.getElementById('fechaNacimiento').value = selectedPerson.fechaNacimiento || '';
+                document.getElementById('fotoAntiguaUrl').value = selectedPerson.antiguo?.fotoUrl || '';
+                document.getElementById('fotoActualUrl').value = selectedPerson.actual?.fotoUrl || '';
+                document.getElementById('email').value = selectedPerson.actual?.email || '';
+                document.getElementById('profesion').value = selectedPerson.actual?.profesion || '';
+                document.getElementById('ciudad').value = selectedPerson.actual?.ciudad || '';
+                window.closeModal();
+            }
+            document.getElementById('data-entry-modal').classList.remove('hidden');
+        }
+
+        window.saveAlumnusData = async function(e) {
+            e.preventDefault();
+            const mode = document.getElementById('form-mode').value;
+            const docId = document.getElementById('form-doc-id').value;
+            const data = {
+                nombre: document.getElementById('nombre').value,
+                apellidos: document.getElementById('apellidos').value,
+                fechaNacimiento: document.getElementById('fechaNacimiento').value,
+                antiguo: { fotoUrl: document.getElementById('fotoAntiguaUrl').value },
+                actual: { 
+                    fotoUrl: document.getElementById('fotoActualUrl').value,
+                    email: document.getElementById('email').value,
+                    profesion: document.getElementById('profesion').value,
+                    ciudad: document.getElementById('ciudad').value
+                }
+            };
+            try {
+                if(mode === 'add') await addDoc(collection(db, getCollectionPath()), data);
+                else await updateDoc(doc(db, getCollectionPath(), docId), data);
+                window.closeDataEntryModal();
+            } catch(e) { alert("Error al guardar"); }
+        }
+
+        window.deleteAlumnusData = async function() {
+            const id = document.getElementById('confirm-doc-id').value;
+            try {
+                await deleteDoc(doc(db, getCollectionPath(), id));
+                document.getElementById('confirm-delete-modal').classList.add('hidden');
+                window.closeModal();
+            } catch(e) { alert("Error al borrar"); }
+        }
+
         window.activarNotificaciones = async function() {
-            if (!messaging) return alert("Tu navegador no soporta notificaciones.");
+            if (!messaging) return alert("Navegador no compatible.");
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    const registration = await navigator.serviceWorker.ready;
-                    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+                    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
                     if (token) {
-                        await setDoc(doc(db, "suscripciones", currentUserId), { token: token, deviceInfo: navigator.userAgent, updatedAt: new Date() });
-                        alert("🔔 ¡Genial! Te avisaremos de los cumpleaños.");
+                        await setDoc(doc(db, "suscripciones", currentUserId), { token: token, updatedAt: new Date() });
+                        alert("¡Suscrito con éxito!");
                     }
                 }
             } catch (err) { console.error(err); }
@@ -406,15 +371,12 @@
     </script>
 
     <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-old-blue to-new-purple"></div>
-            <h2 class="text-3xl font-black text-slate-800 mb-2">Corazón de María</h2>
-            <p class="text-3xl font-black text-slate-800 mb-2">Generación 64</p>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <h2 class="text-3xl font-black text-slate-800 mb-6">Corazón de María 1964</h2>
             <div class="space-y-3">
                 <button onclick="selectView('old')" class="w-full py-4 rounded-xl text-white font-bold bg-old-blue shadow-lg hover:scale-105 transition">🎓 Colegio</button>
                 <button onclick="selectView('current')" class="w-full py-4 rounded-xl text-white font-bold bg-new-purple shadow-lg hover:scale-105 transition">💼 Actualidad</button>
             </div>
-            <div class="mt-6 flex justify-center"><div id="connection-status"></div></div>
         </div>
     </div>
 
@@ -455,15 +417,12 @@
                         </div>
                         <input type="hidden" id="modal-view-state">
                         <button id="modal-toggle-btn" onclick="updateModal(document.getElementById('modal-view-state').value==='old'?'current':'old')"></button>
-                        <div class="w-full mt-4 space-y-3">
-                            <button id="modal-mail-btn" class="hidden w-full py-3 rounded-lg bg-brand-amber text-white font-bold">✉ Enviar Datos</button>
-                            <div class="flex gap-3 w-full">
-                                <button id="modal-edit-btn" class="hidden w-1/2 py-3 rounded-lg bg-slate-700 text-white font-bold border border-slate-600">✏️ Editar</button>
-                                <button id="modal-del-btn" class="hidden w-1/2 py-3 rounded-lg bg-btn-red text-white font-bold">🗑️ Borrar</button>
-                            </div>
+                        <div class="w-full mt-4 flex gap-2">
+                            <button id="modal-edit-btn" class="hidden flex-1 py-3 rounded-lg bg-slate-700 text-white font-bold">Editar</button>
+                            <button id="modal-del-btn" class="hidden flex-1 py-3 rounded-lg bg-btn-red text-white font-bold">Borrar</button>
                         </div>
                     </div>
-                    <div class="md:w-7/12 space-y-4 w-full">
+                    <div class="md:w-7/12 space-y-4 w-full text-white">
                         <div id="past-details" class="bg-slate-800/50 p-4 rounded-xl border border-slate-700"></div>
                         <div id="current-details" class="bg-slate-800/50 p-4 rounded-xl border border-slate-700"></div>
                     </div>
@@ -475,52 +434,36 @@
     <div id="data-entry-modal" class="modal-edit-overlay fixed inset-0 flex items-end md:items-center justify-center p-0 md:p-4 hidden">
         <div class="bg-modal-bg w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-700 p-6 max-h-[95vh] overflow-y-auto dark-scroll text-white">
             <div class="flex justify-between mb-6">
-                <h2 id="data-entry-title" class="text-xl font-bold"></h2>
+                <h2 class="text-xl font-bold">Datos del Alumno</h2>
                 <button onclick="window.closeDataEntryModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
             </div>
             <form id="data-entry-form" onsubmit="saveAlumnusData(event)" class="space-y-4">
                 <input type="hidden" id="form-mode"><input type="hidden" id="form-doc-id">
                 <div class="grid grid-cols-2 gap-3">
-                    <div><label class="text-xs font-bold text-slate-400">Nombre</label><input type="text" id="nombre" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none"></div>
-                    <div><label class="text-xs font-bold text-slate-400">Apellidos</label><input type="text" id="apellidos" required class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none"></div>
+                    <input type="text" id="nombre" placeholder="Nombre" required class="p-3 bg-slate-800 border border-slate-600 rounded-lg outline-none">
+                    <input type="text" id="apellidos" placeholder="Apellidos" required class="p-3 bg-slate-800 border border-slate-600 rounded-lg outline-none">
                 </div>
-                <div><label class="text-xs font-bold text-slate-400">Fecha de Nacimiento</label><input type="date" id="fechaNacimiento" class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg text-white outline-none"></div>
-                <div class="p-3 bg-blue-900/10 rounded-xl border border-blue-900/30">
-                    <h3 class="font-bold text-old-blue mb-2 text-sm">DATOS COLEGIO</h3>
-                    <input type="url" id="fotoAntiguaUrl" placeholder="URL Foto Antigua" class="w-full p-2 mb-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                        <input type="number" id="anoEntrada" placeholder="Año Entr." class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                        <input type="number" id="anoSalida" placeholder="Año Sal." class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                        <input type="text" id="cursoEntrada" placeholder="Curso Entr." class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                        <input type="text" id="cursoSalida" placeholder="Curso Sal." class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                    </div>
-                    <input type="text" id="fechaFotoAntigua" placeholder="Detalle Foto" class="w-full p-2 bg-slate-800 border border-slate-600 rounded text-sm">
+                <input type="date" id="fechaNacimiento" placeholder="Fecha Nacimiento" class="w-full p-3 bg-slate-800 border border-slate-600 rounded-lg outline-none">
+                <div class="p-3 bg-slate-800/50 rounded-xl border border-slate-600">
+                    <input type="url" id="fotoAntiguaUrl" placeholder="URL Foto Colegio" class="w-full p-2 mb-2 bg-slate-800 border rounded text-sm">
+                    <input type="url" id="fotoActualUrl" placeholder="URL Foto Actual" class="w-full p-2 mb-2 bg-slate-800 border rounded text-sm">
+                    <input type="email" id="email" placeholder="Email" class="w-full p-2 mb-2 bg-slate-800 border rounded text-sm">
+                    <input type="text" id="profesion" placeholder="Profesión" class="w-full p-2 mb-2 bg-slate-800 border rounded text-sm">
+                    <input type="text" id="ciudad" placeholder="Ciudad" class="w-full p-2 bg-slate-800 border rounded text-sm">
                 </div>
-                <div class="p-3 bg-purple-900/10 rounded-xl border border-purple-900/30">
-                    <h3 class="font-bold text-new-purple mb-2 text-sm">DATOS ACTUALES</h3>
-                    <input type="url" id="fotoActualUrl" placeholder="URL Foto Actual" class="w-full p-2 mb-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="profesion" placeholder="Profesión" class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                        <input type="text" id="ciudad" placeholder="Ciudad" class="p-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                    </div>
-                    <input type="email" id="email" placeholder="Email" class="w-full p-2 mt-2 bg-slate-800 border border-slate-600 rounded text-sm">
-                </div>
-                <button type="submit" id="data-entry-button" class="w-full py-4 bg-brand-teal text-white font-bold rounded-xl shadow"></button>
-                <div id="data-entry-status" class="text-center text-sm font-bold h-5"></div>
+                <button type="submit" class="w-full py-4 bg-brand-teal text-white font-bold rounded-xl shadow">Guardar Datos</button>
             </form>
         </div>
     </div>
 
     <div id="confirm-delete-modal" class="modal-edit-overlay fixed inset-0 flex items-center justify-center p-4 hidden">
-        <div class="bg-modal-bg rounded-xl p-6 max-w-xs w-full text-center shadow-2xl border border-slate-700">
-            <h3 class="text-lg font-bold text-white mb-2">¿Borrar Ficha?</h3>
-            <p class="text-sm text-slate-400 mb-6">Se eliminará a <span id="confirm-name" class="font-bold text-white"></span>.</p>
+        <div class="bg-modal-bg rounded-xl p-6 max-w-xs w-full text-center border border-slate-700">
+            <h3 class="text-lg font-bold text-white mb-2">¿Borrar?</h3>
+            <p class="text-sm text-slate-400 mb-6">Se eliminará a <span id="confirm-name"></span>.</p>
             <input type="hidden" id="confirm-doc-id">
             <div class="flex gap-3">
-                <button onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')" class="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold">Cancelar</button>
-                <button onclick="deleteAlumnusData()" class="flex-1 py-3 bg-btn-red text-white rounded-xl font-bold">Borrar</button>
+                <button onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')" class="flex-1 py-3 bg-slate-700 text-white rounded-xl">No</button>
+                <button onclick="deleteAlumnusData()" class="flex-1 py-3 bg-btn-red text-white rounded-xl font-bold">Sí, borrar</button>
             </div>
         </div>
     </div>
