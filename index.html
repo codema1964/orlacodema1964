@@ -66,7 +66,7 @@
 
         window.alumniData = [];
         window.currentView = null;
-        window.selectedPerson = null;
+        window.selectedPerson = null; // Variable global para evitar errores
         window.currentUserId = null;
 
         async function init() {
@@ -77,8 +77,12 @@
                 if(u) {
                     window.currentUserId = u.uid;
                     const isAdmin = (u.uid === ADMIN_UID);
-                    document.getElementById('admin-badge').innerHTML = isAdmin ? `<span class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/40">ADMIN</span>` : '';
-                    if(isAdmin) document.getElementById('add-btn').classList.remove('hidden');
+                    
+                    // Mostrar distintivo de admin
+                    document.getElementById('admin-badge').innerHTML = isAdmin ? `<span class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/40 font-mono">MODO ADMIN</span>` : '';
+                    
+                    // Mostrar botones solo si es admin
+                    document.getElementById('add-btn').classList.toggle('hidden', !isAdmin);
                     if(messaging) document.getElementById('notif-btn').classList.remove('hidden');
                 } else {
                     signInAnonymously(auth);
@@ -89,7 +93,8 @@
         }
 
         window.accesoSecretoAdmin = () => {
-            signInWithRedirect(auth, new GoogleAuthProvider());
+            const provider = new GoogleAuthProvider();
+            signInWithRedirect(auth, provider);
         };
 
         window.activarNotificaciones = async () => {
@@ -98,9 +103,9 @@
                 if (permission === 'granted' && messaging) {
                     const token = await getToken(messaging, { vapidKey: VAPID_KEY });
                     await setDoc(doc(db, "suscripciones", window.currentUserId), { token, date: new Date() });
-                    alert("Notificaciones activadas");
+                    alert("¡Notificaciones activadas!");
                 }
-            } catch (e) { alert("Error en notificaciones"); }
+            } catch (e) { alert("Error al activar notificaciones"); }
         };
 
         window.selectView = (v) => {
@@ -116,17 +121,17 @@
         function renderOrla() {
             const isOld = window.currentView === 'old';
             document.getElementById('orla-grid').innerHTML = window.alumniData.map(p => `
-                <div class="bg-white/80 p-2 rounded-xl shadow-sm text-center">
+                <div class="bg-white/90 p-2 rounded-xl shadow-sm text-center card-container">
                     <div class="photo-wrapper mb-2" onclick="openModal('${p.id}')">
                         <img src="${(isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || ''}" class="visible-photo">
                         <img src="${(isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl) || ''}" class="hidden-photo">
                     </div>
-                    <div class="text-[12px] font-bold leading-tight">${p.nombre}<br>${p.apellidos}</div>
+                    <div class="text-[12px] font-bold leading-tight text-slate-800">${p.nombre}<br>${p.apellidos}</div>
                 </div>`).join('');
             
             const btn = document.getElementById('toggle-btn');
-            btn.innerHTML = isOld ? '💼 Ver Presente' : '🎓 Ver Colegio';
-            btn.className = `w-full md:w-auto px-6 py-3 rounded-xl text-white font-bold ${isOld?'bg-new-purple':'bg-old-blue'}`;
+            btn.innerHTML = isOld ? '💼 VER ACTUALIDAD' : '🎓 VER COLEGIO';
+            btn.className = `w-full md:w-auto px-6 py-3 rounded-xl text-white font-black shadow-lg transition ${isOld?'bg-new-purple':'bg-old-blue'}`;
         }
 
         window.openModal = (id) => {
@@ -138,16 +143,16 @@
             document.getElementById('m-photo').src = (isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || '';
             document.getElementById('m-name').innerText = `${p.nombre} ${p.apellidos}`;
             
-            const row = (l, v) => `<div class="flex justify-between py-1 border-b border-slate-700 text-sm"><span>${l}</span><span class="text-slate-300">${v||'-'}</span></div>`;
+            const row = (l, v) => `<div class="flex justify-between py-1.5 border-b border-slate-700 text-sm"><span>${l}</span><span class="text-slate-300 font-medium">${v||'-'}</span></div>`;
             
-            document.getElementById('m-data-old').innerHTML = `<h4 class="text-old-blue font-bold text-xs mb-2">🎓 COLEGIO</h4>
+            document.getElementById('m-data-old').innerHTML = `<h4 class="text-old-blue font-bold text-[10px] mb-2 tracking-widest uppercase">🎓 Etapa Colegio</h4>
                 ${row('Nacimiento', p.fechaNacimiento)}
-                ${row('Entrada', p.antiguo?.anoEntrada)}
-                ${row('Salida', p.antiguo?.anoSalida)}
-                ${row('Curso Ent.', p.antiguo?.cursoEntrada)}
-                ${row('Curso Sal.', p.antiguo?.cursoSalida)}`;
+                ${row('Año Entrada', p.antiguo?.anoEntrada)}
+                ${row('Año Salida', p.antiguo?.anoSalida)}
+                ${row('Curso Entrada', p.antiguo?.cursoEntrada)}
+                ${row('Curso Salida', p.antiguo?.cursoSalida)}`;
 
-            document.getElementById('m-data-new').innerHTML = `<h4 class="text-new-purple font-bold text-xs mb-2">💼 ACTUALIDAD</h4>
+            document.getElementById('m-data-new').innerHTML = `<h4 class="text-new-purple font-bold text-[10px] mb-2 tracking-widest uppercase">💼 Actualidad</h4>
                 ${row('Profesión', p.actual?.profesion)}
                 ${row('Ciudad', p.actual?.ciudad)}
                 ${row('Email', p.actual?.email)}`;
@@ -179,6 +184,13 @@
 
         window.saveData = async (e) => {
             e.preventDefault();
+            
+            // VERIFICACIÓN DE SEGURIDAD ANTES DE GUARDAR
+            if(window.currentUserId !== ADMIN_UID) {
+                alert("Sesión caducada. Escribe 'admin' de nuevo.");
+                return;
+            }
+
             const id = document.getElementById('f-id').value;
             const data = {
                 nombre: document.getElementById('f-nombre').value,
@@ -203,16 +215,22 @@
                 const ref = doc(db, "artifacts/default-app-id/public/data/alumni", id);
                 await updateDoc(ref, data);
                 document.getElementById('edit-modal').classList.add('hidden');
-            } catch (err) { alert("Error de permisos: Escribe 'admin' de nuevo"); }
-        };
-
-        window.deleteAlumnus = async () => {
-            if(confirm("¿Borrar ficha?")) {
-                await deleteDoc(doc(db, "artifacts/default-app-id/public/data/alumni", window.selectedPerson.id));
-                document.getElementById('modal').classList.add('hidden');
+            } catch (err) { 
+                console.error(err);
+                alert("Error de permisos: Asegúrate de ver el cartel verde 'MODO ADMIN' arriba."); 
             }
         };
 
+        window.deleteAlumnus = async () => {
+            if(confirm("¿Estás seguro de borrar esta ficha para siempre?")) {
+                try {
+                    await deleteDoc(doc(db, "artifacts/default-app-id/public/data/alumni", window.selectedPerson.id));
+                    document.getElementById('modal').classList.add('hidden');
+                } catch(e) { alert("No tienes permisos."); }
+            }
+        };
+
+        // Teclado secreto
         let buffer = "";
         window.addEventListener('keydown', e => {
             buffer += e.key.toLowerCase();
@@ -224,80 +242,90 @@
     </script>
 
     <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center hidden p-4">
-        <div class="bg-white p-8 rounded-2xl text-center max-w-sm w-full shadow-2xl">
-            <h2 class="text-2xl font-black mb-6 italic">CODEMA 1964</h2>
-            <button onclick="selectView('old')" class="w-full py-4 mb-4 bg-old-blue text-white rounded-xl font-bold">🎓 COLEGIO</button>
-            <button onclick="selectView('current')" class="w-full py-4 bg-new-purple text-white rounded-xl font-bold">💼 ACTUALIDAD</button>
+        <div class="bg-white p-10 rounded-3xl text-center max-w-sm w-full shadow-2xl border-t-8 border-brand-teal">
+            <h2 class="text-3xl font-black mb-8 italic text-slate-800">CODEMA 1964</h2>
+            <button onclick="selectView('old')" class="w-full py-5 mb-4 bg-old-blue text-white rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg">🎓 COLEGIO</button>
+            <button onclick="selectView('current')" class="w-full py-5 bg-new-purple text-white rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg">💼 ACTUALIDAD</button>
         </div>
     </div>
 
     <div id="app-content" class="hidden">
-        <header class="bg-brand-dark text-white p-4 sticky top-0 z-40 flex justify-between items-center">
-            <span class="font-black italic">CODEMA 64</span>
+        <header class="bg-brand-dark text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-xl">
+            <span class="font-black italic tracking-widest">CODEMA 1964</span>
             <div class="flex gap-2 items-center">
                 <div id="admin-badge"></div>
-                <button id="notif-btn" onclick="activarNotificaciones()" class="hidden bg-brand-amber p-2 rounded-full">🔔</button>
-                <button id="add-btn" onclick="alert('Usa el botón editar de una ficha para añadir o modificar')" class="hidden bg-brand-teal p-2 rounded-full">＋</button>
+                <button id="notif-btn" onclick="activarNotificaciones()" class="hidden bg-brand-amber p-2 rounded-full shadow-lg">🔔</button>
+                <button id="add-btn" onclick="alert('Pulsa en cualquier compañero y dale a EDITAR para modificar sus datos.')" class="hidden bg-brand-teal p-2 rounded-full shadow-lg text-white font-bold text-xl">＋</button>
             </div>
         </header>
         <main class="p-4 max-w-6xl mx-auto">
-            <button id="toggle-btn" onclick="window.currentView = window.currentView === 'old' ? 'current' : 'old'; renderOrla();" class="mb-6"></button>
-            <div id="orla-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"></div>
+            <div class="mb-8 flex justify-center">
+                <button id="toggle-btn" onclick="window.currentView = window.currentView === 'old' ? 'current' : 'old'; renderOrla();"></button>
+            </div>
+            <div id="orla-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6"></div>
         </main>
     </div>
 
     <div id="modal" class="modal-overlay fixed inset-0 flex items-center justify-center hidden p-4" onclick="if(event.target===this)this.classList.add('hidden')">
-        <div class="bg-modal-bg text-white rounded-2xl w-full max-w-2xl overflow-hidden border border-slate-700">
-            <div class="p-6 flex flex-col md:flex-row gap-6">
-                <div class="md:w-1/3">
-                    <img id="m-photo" class="w-full h-64 object-cover rounded-xl border border-slate-600 mb-4">
-                    <button id="m-edit-btn" onclick="openEdit()" class="w-full py-2 bg-slate-700 rounded-lg text-xs font-bold mb-2">✏️ EDITAR</button>
-                    <button id="m-del-btn" onclick="deleteAlumnus()" class="w-full py-2 bg-btn-red/50 rounded-lg text-xs font-bold">🗑️ BORRAR</button>
+        <div class="bg-modal-bg text-white rounded-3xl w-full max-w-2xl overflow-hidden border border-slate-700 shadow-2xl">
+            <div class="p-8 flex flex-col md:flex-row gap-8">
+                <div class="md:w-1/3 text-center">
+                    <img id="m-photo" class="w-full h-72 object-cover rounded-2xl border-4 border-slate-700 mb-6 shadow-2xl">
+                    <button id="m-edit-btn" onclick="openEdit()" class="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold mb-3 border border-slate-500 transition">✏️ EDITAR FICHA</button>
+                    <button id="m-del-btn" onclick="deleteAlumnus()" class="w-full py-3 bg-btn-red/30 hover:bg-btn-red/50 text-btn-red rounded-xl text-sm font-bold transition">🗑️ BORRAR</button>
                 </div>
                 <div class="md:w-2/3">
-                    <h2 id="m-name" class="text-2xl font-black mb-4 italic"></h2>
-                    <div id="m-data-old" class="mb-4 p-3 bg-slate-800/50 rounded-xl"></div>
-                    <div id="m-data-new" class="p-3 bg-slate-800/50 rounded-xl"></div>
+                    <h2 id="m-name" class="text-3xl font-black mb-6 italic tracking-tight"></h2>
+                    <div id="m-data-old" class="mb-6 p-4 bg-slate-800/50 rounded-2xl border border-slate-700 shadow-inner"></div>
+                    <div id="m-data-new" class="p-4 bg-slate-800/50 rounded-2xl border border-slate-700 shadow-inner"></div>
+                    <button onclick="document.getElementById('modal').classList.add('hidden')" class="mt-6 w-full py-2 text-slate-500 font-bold hover:text-white transition uppercase text-xs tracking-widest">Cerrar</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="edit-modal" class="modal-edit-overlay fixed inset-0 flex items-center justify-center hidden p-4">
-        <form onsubmit="saveData(event)" class="bg-modal-bg text-white p-6 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-brand-teal space-y-4">
+        <form onsubmit="saveData(event)" class="bg-modal-bg text-white p-8 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border-2 border-brand-teal shadow-2xl space-y-5">
             <input type="hidden" id="f-id">
-            <h2 class="font-bold border-b border-slate-700 pb-2">EDITAR COMPAÑERO</h2>
-            <div class="grid grid-cols-2 gap-2">
-                <input id="f-nombre" placeholder="Nombre" class="p-2 bg-slate-800 rounded">
-                <input id="f-apellidos" placeholder="Apellidos" class="p-2 bg-slate-800 rounded">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4">
+                <h2 class="font-black italic text-xl">EDITAR COMPAÑERO</h2>
+                <button type="button" onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-slate-500 hover:text-white text-2xl">&times;</button>
             </div>
-            <input id="f-nacimiento" placeholder="Nacimiento" class="w-full p-2 bg-slate-800 rounded">
             
-            <div class="p-3 bg-old-blue/10 border border-old-blue/20 rounded-xl space-y-2">
-                <p class="text-[10px] font-bold text-old-blue">DATOS COLEGIO</p>
-                <input id="f-foto-o" placeholder="URL Foto Antigua" class="w-full p-2 bg-slate-800 rounded text-xs">
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="f-ent" placeholder="Año Entr." class="p-2 bg-slate-800 rounded text-xs">
-                    <input id="f-sal" placeholder="Año Sal." class="p-2 bg-slate-800 rounded text-xs">
-                    <input id="f-cent" placeholder="Curso Entr." class="p-2 bg-slate-800 rounded text-xs">
-                    <input id="f-csal" placeholder="Curso Sal." class="p-2 bg-slate-800 rounded text-xs">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase">Nombre</label>
+                    <input id="f-nombre" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 focus:border-brand-teal outline-none">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase">Apellidos</label>
+                    <input id="f-apellidos" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 focus:border-brand-teal outline-none">
                 </div>
             </div>
 
-            <div class="p-3 bg-new-purple/10 border border-new-purple/20 rounded-xl space-y-2">
-                <p class="text-[10px] font-bold text-new-purple">DATOS ACTUALES</p>
-                <input id="f-foto-n" placeholder="URL Foto Actual" class="w-full p-2 bg-slate-800 rounded text-xs">
-                <input id="f-prof" placeholder="Profesión" class="w-full p-2 bg-slate-800 rounded text-xs">
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="f-ciu" placeholder="Ciudad" class="p-2 bg-slate-800 rounded text-xs">
-                    <input id="f-mail" placeholder="Email" class="p-2 bg-slate-800 rounded text-xs">
+            <div class="p-4 bg-old-blue/5 border border-old-blue/20 rounded-2xl space-y-3">
+                <p class="text-[10px] font-black text-old-blue uppercase tracking-widest">🎓 Datos Colegio</p>
+                <input id="f-nacimiento" placeholder="Fecha Nacimiento" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <input id="f-foto-o" placeholder="URL Foto Colegio (Antigua)" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="f-ent" placeholder="Año Entrada" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                    <input id="f-sal" placeholder="Año Salida" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                    <input id="f-cent" placeholder="Curso Entr." class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                    <input id="f-csal" placeholder="Curso Sal." class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
                 </div>
             </div>
 
-            <div class="flex gap-2">
-                <button type="submit" class="flex-1 py-3 bg-brand-teal rounded-xl font-bold">GUARDAR</button>
-                <button type="button" onclick="document.getElementById('edit-modal').classList.add('hidden')" class="px-4 bg-slate-700 rounded-xl">CERRAR</button>
+            <div class="p-4 bg-new-purple/5 border border-new-purple/20 rounded-2xl space-y-3">
+                <p class="text-[10px] font-black text-new-purple uppercase tracking-widest">💼 Datos Actualidad</p>
+                <input id="f-foto-n" placeholder="URL Foto Actual" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <input id="f-prof" placeholder="Profesión / Actividad" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="f-ciu" placeholder="Ciudad actual" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                    <input id="f-mail" placeholder="Email" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                </div>
             </div>
+
+            <button type="submit" class="w-full py-5 bg-brand-teal text-white font-black rounded-2xl shadow-xl hover:bg-teal-700 transition uppercase tracking-widest italic">Guardar Cambios</button>
         </form>
     </div>
 
