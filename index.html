@@ -24,7 +24,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); min-height: 100vh; }
-        .photo-wrapper { position: relative; overflow: hidden; border-radius: 0.75rem; width: 100%; padding-top: 100%; background-color: #e2e8f0; cursor: pointer; }
+        .photo-wrapper { position: relative; overflow: hidden; border-radius: 0.75rem; width: 100%; padding-top: 100%; background-color: #e2e8f0; cursor: pointer; border: 1px solid #cbd5e1; }
         .photo-wrapper img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.5s ease; }
         .photo-wrapper img.hidden-photo { opacity: 0; }
         .photo-wrapper:hover img.hidden-photo { opacity: 1; }
@@ -38,7 +38,7 @@
 <body>
 
     <div id="splash-screen">
-        <h1 class="text-2xl font-black text-white tracking-widest animate-pulse">CODEMA 1964</h1>
+        <h1 class="text-2xl font-black text-white tracking-widest animate-pulse uppercase">Codema 1964</h1>
     </div>
 
     <script type="module">
@@ -66,7 +66,7 @@
 
         window.alumniData = [];
         window.currentView = null;
-        window.selectedPerson = null; // Variable global para evitar errores
+        window.selectedPerson = null;
         window.currentUserId = null;
 
         async function init() {
@@ -77,12 +77,7 @@
                 if(u) {
                     window.currentUserId = u.uid;
                     const isAdmin = (u.uid === ADMIN_UID);
-                    
-                    // Mostrar distintivo de admin
-                    document.getElementById('admin-badge').innerHTML = isAdmin ? `<span class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/40 font-mono">MODO ADMIN</span>` : '';
-                    
-                    // Mostrar botones solo si es admin
-                    document.getElementById('add-btn').classList.toggle('hidden', !isAdmin);
+                    document.getElementById('admin-badge').innerHTML = isAdmin ? `<span class="bg-emerald-500 text-white text-[10px] px-2 py-1 rounded font-bold">MODO ADMIN</span>` : '';
                     if(messaging) document.getElementById('notif-btn').classList.remove('hidden');
                 } else {
                     signInAnonymously(auth);
@@ -93,19 +88,7 @@
         }
 
         window.accesoSecretoAdmin = () => {
-            const provider = new GoogleAuthProvider();
-            signInWithRedirect(auth, provider);
-        };
-
-        window.activarNotificaciones = async () => {
-            try {
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted' && messaging) {
-                    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-                    await setDoc(doc(db, "suscripciones", window.currentUserId), { token, date: new Date() });
-                    alert("¡Notificaciones activadas!");
-                }
-            } catch (e) { alert("Error al activar notificaciones"); }
+            signInWithRedirect(auth, new GoogleAuthProvider());
         };
 
         window.selectView = (v) => {
@@ -113,25 +96,34 @@
             document.getElementById('selection-modal').classList.add('hidden');
             document.getElementById('app-content').classList.remove('hidden');
             onSnapshot(query(collection(db, "artifacts/default-app-id/public/data/alumni")), s => {
-                window.alumniData = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=> (a.apellidos||'').localeCompare(b.apellidos||''));
-                renderOrla();
+                window.alumniData = s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=> (a.apellidos || "").localeCompare(b.apellidos || ""));
+                renderOrla(window.alumniData);
             });
         };
 
-        function renderOrla() {
+        window.filtrarCompañeros = (texto) => {
+            const t = texto.toLowerCase();
+            const filtrados = window.alumniData.filter(p => {
+                const nombreCompleto = `${p.nombre || ""} ${p.apellidos || ""}`.toLowerCase();
+                return nombreCompleto.includes(t);
+            });
+            renderOrla(filtrados);
+        };
+
+        function renderOrla(datos) {
             const isOld = window.currentView === 'old';
-            document.getElementById('orla-grid').innerHTML = window.alumniData.map(p => `
-                <div class="bg-white/90 p-2 rounded-xl shadow-sm text-center card-container">
+            document.getElementById('orla-grid').innerHTML = datos.map(p => `
+                <div class="bg-white p-2 rounded-xl shadow-sm text-center">
                     <div class="photo-wrapper mb-2" onclick="openModal('${p.id}')">
-                        <img src="${(isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || ''}" class="visible-photo">
-                        <img src="${(isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl) || ''}" class="hidden-photo">
+                        <img src="${(isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || 'https://via.placeholder.com/300?text=Sin+Foto'}" class="visible-photo">
+                        <img src="${(isOld ? p.actual?.fotoUrl : p.antiguo?.fotoUrl) || 'https://via.placeholder.com/300?text=Sin+Foto'}" class="hidden-photo">
                     </div>
-                    <div class="text-[12px] font-bold leading-tight text-slate-800">${p.nombre}<br>${p.apellidos}</div>
+                    <div class="text-[12px] font-bold leading-tight text-slate-800">${p.nombre || "Sin nombre"}<br>${p.apellidos || ""}</div>
                 </div>`).join('');
             
             const btn = document.getElementById('toggle-btn');
             btn.innerHTML = isOld ? '💼 VER ACTUALIDAD' : '🎓 VER COLEGIO';
-            btn.className = `w-full md:w-auto px-6 py-3 rounded-xl text-white font-black shadow-lg transition ${isOld?'bg-new-purple':'bg-old-blue'}`;
+            btn.className = `w-full md:w-auto px-6 py-3 rounded-xl text-white font-black shadow-lg ${isOld?'bg-new-purple':'bg-old-blue'}`;
         }
 
         window.openModal = (id) => {
@@ -140,19 +132,17 @@
             const isOld = window.currentView === 'old';
             const isAdmin = (window.currentUserId === ADMIN_UID);
 
-            document.getElementById('m-photo').src = (isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || '';
-            document.getElementById('m-name').innerText = `${p.nombre} ${p.apellidos}`;
+            document.getElementById('m-photo').src = (isOld ? p.antiguo?.fotoUrl : p.actual?.fotoUrl) || 'https://via.placeholder.com/300?text=Sin+Foto';
+            document.getElementById('m-name').innerText = `${p.nombre || ""} ${p.apellidos || ""}`;
             
-            const row = (l, v) => `<div class="flex justify-between py-1.5 border-b border-slate-700 text-sm"><span>${l}</span><span class="text-slate-300 font-medium">${v||'-'}</span></div>`;
+            const row = (l, v) => `<div class="flex justify-between py-1.5 border-b border-slate-700 text-sm"><span>${l}</span><span class="text-slate-300">${v||'-'}</span></div>`;
             
-            document.getElementById('m-data-old').innerHTML = `<h4 class="text-old-blue font-bold text-[10px] mb-2 tracking-widest uppercase">🎓 Etapa Colegio</h4>
+            document.getElementById('m-data-old').innerHTML = `<h4 class="text-old-blue font-bold text-[10px] mb-2 uppercase">🎓 Colegio</h4>
                 ${row('Nacimiento', p.fechaNacimiento)}
                 ${row('Año Entrada', p.antiguo?.anoEntrada)}
-                ${row('Año Salida', p.antiguo?.anoSalida)}
-                ${row('Curso Entrada', p.antiguo?.cursoEntrada)}
-                ${row('Curso Salida', p.antiguo?.cursoSalida)}`;
+                ${row('Año Salida', p.antiguo?.anoSalida)}`;
 
-            document.getElementById('m-data-new').innerHTML = `<h4 class="text-new-purple font-bold text-[10px] mb-2 tracking-widest uppercase">💼 Actualidad</h4>
+            document.getElementById('m-data-new').innerHTML = `<h4 class="text-new-purple font-bold text-[10px] mb-2 uppercase">💼 Actualidad</h4>
                 ${row('Profesión', p.actual?.profesion)}
                 ${row('Ciudad', p.actual?.ciudad)}
                 ${row('Email', p.actual?.email)}`;
@@ -162,21 +152,23 @@
             document.getElementById('modal').classList.remove('hidden');
         };
 
-        window.openEdit = () => {
-            const p = window.selectedPerson;
-            document.getElementById('f-id').value = p.id;
-            document.getElementById('f-nombre').value = p.nombre || '';
-            document.getElementById('f-apellidos').value = p.apellidos || '';
-            document.getElementById('f-nacimiento').value = p.fechaNacimiento || '';
-            document.getElementById('f-foto-o').value = p.antiguo?.fotoUrl || '';
-            document.getElementById('f-ent').value = p.antiguo?.anoEntrada || '';
-            document.getElementById('f-sal').value = p.antiguo?.anoSalida || '';
-            document.getElementById('f-cent').value = p.antiguo?.cursoEntrada || '';
-            document.getElementById('f-csal').value = p.antiguo?.cursoSalida || '';
-            document.getElementById('f-foto-n').value = p.actual?.fotoUrl || '';
-            document.getElementById('f-prof').value = p.actual?.profesion || '';
-            document.getElementById('f-ciu').value = p.actual?.ciudad || '';
-            document.getElementById('f-mail').value = p.actual?.email || '';
+        window.openEdit = (modo) => {
+            const form = document.getElementById('edit-form');
+            form.reset();
+            document.getElementById('f-modo').value = modo;
+
+            if(modo === 'editar') {
+                const p = window.selectedPerson;
+                document.getElementById('f-id').value = p.id;
+                document.getElementById('f-nombre').value = p.nombre || '';
+                document.getElementById('f-apellidos').value = p.apellidos || '';
+                document.getElementById('f-nacimiento').value = p.fechaNacimiento || '';
+                document.getElementById('f-foto-o').value = p.antiguo?.fotoUrl || '';
+                document.getElementById('f-foto-n').value = p.actual?.fotoUrl || '';
+                document.getElementById('f-prof').value = p.actual?.profesion || '';
+                document.getElementById('f-ciu').value = p.actual?.ciudad || '';
+                document.getElementById('f-mail').value = p.actual?.email || '';
+            }
             
             document.getElementById('modal').classList.add('hidden');
             document.getElementById('edit-modal').classList.remove('hidden');
@@ -184,26 +176,15 @@
 
         window.saveData = async (e) => {
             e.preventDefault();
-            
-            // VERIFICACIÓN DE SEGURIDAD ANTES DE GUARDAR
-            if(window.currentUserId !== ADMIN_UID) {
-                alert("Sesión caducada. Escribe 'admin' de nuevo.");
-                return;
-            }
-
+            const modo = document.getElementById('f-modo').value;
             const id = document.getElementById('f-id').value;
+            
             const data = {
                 nombre: document.getElementById('f-nombre').value,
                 apellidos: document.getElementById('f-apellidos').value,
                 fechaNacimiento: document.getElementById('f-nacimiento').value,
-                antiguo: {
-                    fotoUrl: document.getElementById('f-foto-o').value,
-                    anoEntrada: document.getElementById('f-ent').value,
-                    anoSalida: document.getElementById('f-sal').value,
-                    cursoEntrada: document.getElementById('f-cent').value,
-                    cursoSalida: document.getElementById('f-csal').value
-                },
-                actual: {
+                antiguo: { fotoUrl: document.getElementById('f-foto-o').value },
+                actual: { 
                     fotoUrl: document.getElementById('f-foto-n').value,
                     profesion: document.getElementById('f-prof').value,
                     ciudad: document.getElementById('f-ciu').value,
@@ -212,25 +193,17 @@
             };
 
             try {
-                const ref = doc(db, "artifacts/default-app-id/public/data/alumni", id);
-                await updateDoc(ref, data);
+                const colPath = "artifacts/default-app-id/public/data/alumni";
+                if(modo === 'editar') {
+                    await updateDoc(doc(db, colPath, id), data);
+                } else {
+                    await addDoc(collection(db, colPath), data);
+                }
                 document.getElementById('edit-modal').classList.add('hidden');
-            } catch (err) { 
-                console.error(err);
-                alert("Error de permisos: Asegúrate de ver el cartel verde 'MODO ADMIN' arriba."); 
-            }
+                alert("¡Datos enviados correctamente!");
+            } catch (err) { alert("Error al guardar. Si eres admin, escribe 'admin'."); }
         };
 
-        window.deleteAlumnus = async () => {
-            if(confirm("¿Estás seguro de borrar esta ficha para siempre?")) {
-                try {
-                    await deleteDoc(doc(db, "artifacts/default-app-id/public/data/alumni", window.selectedPerson.id));
-                    document.getElementById('modal').classList.add('hidden');
-                } catch(e) { alert("No tienes permisos."); }
-            }
-        };
-
-        // Teclado secreto
         let buffer = "";
         window.addEventListener('keydown', e => {
             buffer += e.key.toLowerCase();
@@ -242,25 +215,27 @@
     </script>
 
     <div id="selection-modal" class="modal-overlay fixed inset-0 flex items-center justify-center hidden p-4">
-        <div class="bg-white p-10 rounded-3xl text-center max-w-sm w-full shadow-2xl border-t-8 border-brand-teal">
-            <h2 class="text-3xl font-black mb-8 italic text-slate-800">CODEMA 1964</h2>
-            <button onclick="selectView('old')" class="w-full py-5 mb-4 bg-old-blue text-white rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg">🎓 COLEGIO</button>
-            <button onclick="selectView('current')" class="w-full py-5 bg-new-purple text-white rounded-2xl font-black text-xl hover:scale-105 transition shadow-lg">💼 ACTUALIDAD</button>
+        <div class="bg-white p-10 rounded-3xl text-center max-w-sm w-full shadow-2xl">
+            <h2 class="text-2xl font-black mb-8 italic">CODEMA 1964</h2>
+            <button onclick="selectView('old')" class="w-full py-5 mb-4 bg-old-blue text-white rounded-2xl font-black">🎓 VER COLEGIO</button>
+            <button onclick="selectView('current')" class="w-full py-5 bg-new-purple text-white rounded-2xl font-black">💼 VER ACTUALIDAD</button>
         </div>
     </div>
 
     <div id="app-content" class="hidden">
         <header class="bg-brand-dark text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-xl">
-            <span class="font-black italic tracking-widest">CODEMA 1964</span>
+            <span class="font-black italic">CODEMA 1964</span>
             <div class="flex gap-2 items-center">
                 <div id="admin-badge"></div>
-                <button id="notif-btn" onclick="activarNotificaciones()" class="hidden bg-brand-amber p-2 rounded-full shadow-lg">🔔</button>
-                <button id="add-btn" onclick="alert('Pulsa en cualquier compañero y dale a EDITAR para modificar sus datos.')" class="hidden bg-brand-teal p-2 rounded-full shadow-lg text-white font-bold text-xl">＋</button>
+                <button id="notif-btn" class="hidden bg-brand-amber p-2 rounded-full">🔔</button>
+                <button onclick="openEdit('nuevo')" class="bg-brand-teal px-4 py-2 rounded-lg text-xs font-bold shadow-lg">＋ ENVIAR MIS DATOS</button>
             </div>
         </header>
+
         <main class="p-4 max-w-6xl mx-auto">
-            <div class="mb-8 flex justify-center">
-                <button id="toggle-btn" onclick="window.currentView = window.currentView === 'old' ? 'current' : 'old'; renderOrla();"></button>
+            <div class="mb-6 flex flex-col md:flex-row gap-4">
+                <input type="text" onkeyup="filtrarCompañeros(this.value)" placeholder="Buscar compañero..." class="flex-grow p-4 rounded-xl border border-slate-300 outline-none">
+                <button id="toggle-btn" onclick="window.currentView = window.currentView === 'old' ? 'current' : 'old'; selectView(window.currentView);"></button>
             </div>
             <div id="orla-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6"></div>
         </main>
@@ -271,61 +246,48 @@
             <div class="p-8 flex flex-col md:flex-row gap-8">
                 <div class="md:w-1/3 text-center">
                     <img id="m-photo" class="w-full h-72 object-cover rounded-2xl border-4 border-slate-700 mb-6 shadow-2xl">
-                    <button id="m-edit-btn" onclick="openEdit()" class="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold mb-3 border border-slate-500 transition">✏️ EDITAR FICHA</button>
-                    <button id="m-del-btn" onclick="deleteAlumnus()" class="w-full py-3 bg-btn-red/30 hover:bg-btn-red/50 text-btn-red rounded-xl text-sm font-bold transition">🗑️ BORRAR</button>
+                    <button id="m-edit-btn" onclick="openEdit('editar')" class="hidden w-full py-3 bg-slate-700 rounded-xl text-sm font-bold mb-3 border border-slate-500">✏️ EDITAR</button>
+                    <button id="m-del-btn" class="hidden w-full py-3 bg-btn-red/30 text-btn-red rounded-xl text-sm font-bold">🗑️ BORRAR</button>
                 </div>
                 <div class="md:w-2/3">
                     <h2 id="m-name" class="text-3xl font-black mb-6 italic tracking-tight"></h2>
-                    <div id="m-data-old" class="mb-6 p-4 bg-slate-800/50 rounded-2xl border border-slate-700 shadow-inner"></div>
-                    <div id="m-data-new" class="p-4 bg-slate-800/50 rounded-2xl border border-slate-700 shadow-inner"></div>
-                    <button onclick="document.getElementById('modal').classList.add('hidden')" class="mt-6 w-full py-2 text-slate-500 font-bold hover:text-white transition uppercase text-xs tracking-widest">Cerrar</button>
+                    <div id="m-data-old" class="mb-6 p-4 bg-slate-800/50 rounded-2xl border border-slate-700"></div>
+                    <div id="m-data-new" class="p-4 bg-slate-800/50 rounded-2xl border border-slate-700"></div>
+                    <button onclick="document.getElementById('modal').classList.add('hidden')" class="mt-6 w-full py-2 text-slate-500 font-bold uppercase text-xs">Cerrar</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="edit-modal" class="modal-edit-overlay fixed inset-0 flex items-center justify-center hidden p-4">
-        <form onsubmit="saveData(event)" class="bg-modal-bg text-white p-8 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border-2 border-brand-teal shadow-2xl space-y-5">
+        <form id="edit-form" onsubmit="saveData(event)" class="bg-modal-bg text-white p-8 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border-2 border-brand-teal space-y-5">
             <input type="hidden" id="f-id">
+            <input type="hidden" id="f-modo">
             <div class="flex justify-between items-center border-b border-slate-700 pb-4">
-                <h2 class="font-black italic text-xl">EDITAR COMPAÑERO</h2>
-                <button type="button" onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-slate-500 hover:text-white text-2xl">&times;</button>
+                <h2 class="font-black italic text-xl">FORMULARIO DE DATOS</h2>
+                <button type="button" onclick="document.getElementById('edit-modal').classList.add('hidden')" class="text-slate-500 text-2xl">&times;</button>
             </div>
             
             <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label class="text-[10px] text-slate-500 font-bold uppercase">Nombre</label>
-                    <input id="f-nombre" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 focus:border-brand-teal outline-none">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-[10px] text-slate-500 font-bold uppercase">Apellidos</label>
-                    <input id="f-apellidos" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 focus:border-brand-teal outline-none">
-                </div>
+                <input id="f-nombre" placeholder="Nombre" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 outline-none">
+                <input id="f-apellidos" placeholder="Apellidos" required class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 outline-none">
             </div>
-
-            <div class="p-4 bg-old-blue/5 border border-old-blue/20 rounded-2xl space-y-3">
-                <p class="text-[10px] font-black text-old-blue uppercase tracking-widest">🎓 Datos Colegio</p>
-                <input id="f-nacimiento" placeholder="Fecha Nacimiento" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+            <input id="f-nacimiento" placeholder="Fecha Nacimiento (DD/MM/AAAA)" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600">
+            
+            <div class="space-y-3">
+                <p class="text-[10px] font-black text-brand-teal uppercase">Fotos (Pega el enlace)</p>
                 <input id="f-foto-o" placeholder="URL Foto Colegio (Antigua)" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                <div class="grid grid-cols-2 gap-3">
-                    <input id="f-ent" placeholder="Año Entrada" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                    <input id="f-sal" placeholder="Año Salida" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                    <input id="f-cent" placeholder="Curso Entr." class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                    <input id="f-csal" placeholder="Curso Sal." class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                </div>
-            </div>
-
-            <div class="p-4 bg-new-purple/5 border border-new-purple/20 rounded-2xl space-y-3">
-                <p class="text-[10px] font-black text-new-purple uppercase tracking-widest">💼 Datos Actualidad</p>
                 <input id="f-foto-n" placeholder="URL Foto Actual" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                <input id="f-prof" placeholder="Profesión / Actividad" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                <div class="grid grid-cols-2 gap-3">
-                    <input id="f-ciu" placeholder="Ciudad actual" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                    <input id="f-mail" placeholder="Email" class="p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
-                </div>
             </div>
 
-            <button type="submit" class="w-full py-5 bg-brand-teal text-white font-black rounded-2xl shadow-xl hover:bg-teal-700 transition uppercase tracking-widest italic">Guardar Cambios</button>
+            <div class="space-y-3">
+                <p class="text-[10px] font-black text-brand-teal uppercase">Información Actual</p>
+                <input id="f-prof" placeholder="Profesión" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <input id="f-ciu" placeholder="Ciudad" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+                <input id="f-mail" type="email" placeholder="Email de contacto" class="w-full p-3 bg-slate-800 rounded-xl border border-slate-600 text-sm">
+            </div>
+
+            <button type="submit" class="w-full py-5 bg-brand-teal text-white font-black rounded-2xl shadow-xl uppercase italic">Enviar Datos</button>
         </form>
     </div>
 
