@@ -78,36 +78,117 @@
             appId: "1:550229291802:web:1907dc83e4c3c0facc32a3"
         };
 
-        const ADMIN_UID = 'TLshlr1Vz7PasQvIYXhbytBAq1n1';
-        const appId = 'default-app-id';
-        let db, auth, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null;
+        // Tu UID real de Google que vimos antes
+        const ADMIN_UID = 'TLshlr1Vz7PasQvIYXhbytBAq1n1'; 
+        const ADMIN_EMAIL = 'codema1964@gmail.com'; 
+        const appId = 'default-app-id'; 
+        const VAPID_KEY = 'BBEipgrXPOxTPYzRFP63bF6NJVsDPUnsmhMhqAXSSaoX75oBEUbiNJZ0LG5GMxBrhipkcyBQZuTZ3WCscou5sY0'; 
+        
+        let db, auth, messaging, alumniData=[], currentView=null, selectedPerson=null, currentUserId=null; 
+        const getCollectionPath = () => `/artifacts/${appId}/public/data/alumni`;
 
         async function init() {
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            await setPersistence(auth, browserLocalPersistence);
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                try { messaging = getMessaging(app); } catch(e) {}
 
-            // Manejo de redirección de Google
-            try { await getRedirectResult(auth); } catch (e) { console.error(e); }
+                await setPersistence(auth, browserLocalPersistence);
+                
+                // IMPORTANTE: Procesar el resultado del login de Google si volvemos de la redirección
+                await getRedirectResult(auth);
 
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUserId = user.uid;
-                    const isAdmin = (currentUserId === ADMIN_UID);
-                    console.log("Usuario actual:", currentUserId, "Es Admin:", isAdmin);
+                onAuthStateChanged(auth, async u => {
+                    if(u) {
+                        currentUserId = u.uid;
+                        const admin = isCurrentUserAdmin();
+                        
+                        // Si el usuario es anónimo y NO es admin, mantenemos anónimo. 
+                        // Si tecleaste "admin", u.uid será tu UID de Google.
+                        const display = document.getElementById('current-uid-display');
+                        display.innerHTML = admin ? 
+                            `<span class="text-emerald-400 text-xs font-mono bg-emerald-900/30 px-2 py-1 rounded border border-emerald-500/30">ADMIN</span>` : ``;
+                        
+                        if(admin) document.getElementById('add-btn-header').classList.remove('hidden');
+                        if(messaging) document.getElementById('notif-btn-header').classList.remove('hidden');
 
-                    const addBtnHeader = document.getElementById('add-btn-header');
-                    if (addBtnHeader) addBtnHeader.classList.toggle('hidden', !isAdmin);
-                    
-                    setTimeout(() => {
-                        document.getElementById('splash-screen').classList.add('hidden-splash');
-                        if (!currentView) document.getElementById('selection-modal').classList.remove('hidden');
-                    }, 1000);
+                        const splash = document.getElementById('splash-screen');
+                        if (splash) {
+                            splash.classList.add('hidden-splash');
+                            setTimeout(() => splash.remove(), 800);
+                        }
+                        
+                        // Solo mostramos el selector si no hemos elegido vista aún
+                        if(!currentView) document.getElementById('selection-modal').classList.remove('hidden');
+                    } else {
+                        // Si no hay nadie, entramos como anónimo por defecto
+                        signInAnonymously(auth);
+                    }
+                });
+            } catch(e) { 
+                console.error(e);
+            }
+        }
+        
+        function isCurrentUserAdmin() { return currentUserId === ADMIN_UID; }
+
+        window.saveAlumnusData = async function(e) {
+            e.preventDefault();
+            
+            // Verificación extra de seguridad en el cliente
+            if(!isCurrentUserAdmin()) {
+                alert("No tienes permisos de escritura. Asegúrate de estar logueado como Admin.");
+                return;
+            }
+
+            const st = document.getElementById('data-entry-status');
+            st.innerHTML = '<span class="text-brand-teal animate-pulse">Guardando en la base de datos...</span>';
+            
+            const getVal = (id) => document.getElementById(id).value;
+            const mode = document.getElementById('form-mode').value;
+            const docId = document.getElementById('form-doc-id').value;
+
+            const data = {
+                nombre: getVal('nombre'), 
+                apellidos: getVal('apellidos'),
+                fechaNacimiento: getVal('fechaNacimiento'),
+                antiguo: {
+                    fotoUrl: getVal('fotoAntiguaUrl'), 
+                    anoEntrada: getVal('anoEntrada'), 
+                    anoSalida: getVal('anoSalida'),
+                    cursoEntrada: getVal('cursoEntrada'), 
+                    cursoSalida: getVal('cursoSalida'), 
+                    fechaFoto: getVal('fechaFotoAntigua')
+                },
+                actual: {
+                    fotoUrl: getVal('fotoActualUrl'), 
+                    profesion: getVal('profesion'), 
+                    ciudad: getVal('ciudad'), 
+                    email: getVal('email')
+                },
+                lastModifiedBy: currentUserId,
+                updatedAt: new Date()
+            };
+
+            try {
+                const path = getCollectionPath();
+                if(mode === 'add') {
+                    await addDoc(collection(db, path), data);
                 } else {
-                    signInAnonymously(auth);
+                    // Usamos updateDoc para no borrar campos que no hayamos tocado
+                    await updateDoc(doc(db, path, docId), data);
                 }
-            });
+                st.innerHTML = '<span class="text-emerald-400">¡Cambios guardados con éxito!</span>';
+                setTimeout(() => {
+                    window.closeDataEntryModal();
+                    // Forzamos un refresco visual si es necesario, aunque onSnapshot lo hará solo
+                }, 1000);
+            } catch(err) { 
+                console.error("Error detallado de Firebase:", err);
+                st.innerHTML = `<span class="text-red-500">Error: Permiso denegado o fallo de red</span>`;
+            }
         }
 
         window.accesoSecretoAdmin = function() {
